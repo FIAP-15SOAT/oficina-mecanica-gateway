@@ -1,0 +1,68 @@
+openapi: "3.0.1"
+
+info:
+  title: ${api_name}
+  description: API Gateway da solução Oficina Mecanica.
+  version: "1.0.0"
+
+paths:
+  /customer-auth/login:
+    post:
+      summary: Autenticação de clientes
+      description: Gera um access token para autenticação externa de clientes (sem acesso administrativo).
+      responses:
+        default:
+          description: Resposta produzida pela função serverless, encaminhada sem alteração.
+      x-amazon-apigateway-integration:
+        $ref: "#/components/x-amazon-apigateway-integrations/lambda"
+
+  /api/auth/login:
+    post:
+      summary: Autenticação de usuários internos
+      description: Gere um access token e um refresh token para usuários internos (funcionários)
+      responses:
+        default:
+          description: Resposta produzida pela API, encaminhada sem alteração.
+      x-amazon-apigateway-integration:
+        $ref: "#/components/x-amazon-apigateway-integrations/eks"
+
+  /api/{proxy+}:
+    x-amazon-apigateway-any-method:
+      summary: Proxy para os endpoints da API
+      description: >-
+        Encaminha qualquer método e qualquer caminho sob /api para a API no
+        EKS, pela integracao privada.
+      parameters:
+        - name: proxy
+          in: path
+          required: true
+          description: Restante do caminho, encaminhado a aplicação.
+          schema:
+            type: string
+      responses:
+        default:
+          description: Resposta produzida pela API, encaminhada sem alteração.
+      x-amazon-apigateway-integration:
+        $ref: "#/components/x-amazon-apigateway-integrations/eks"
+
+components:
+  x-amazon-apigateway-integrations:
+    eks:
+      type: http_proxy
+      httpMethod: ANY
+      payloadFormatVersion: "1.0"
+      connectionType: VPC_LINK
+      connectionId: "${vpc_link_id}"
+      uri: "${nlb_listener_arn}"
+      requestParameters:
+        overwrite:path: $request.path
+        # Unifica o identificador de correlação
+        overwrite:header.x-request-id: $context.requestId
+
+    lambda:
+      type: aws_proxy
+      httpMethod: POST
+      payloadFormatVersion: "2.0"
+      uri: "${customer_auth_integration_uri}"
+      requestParameters:
+        overwrite:header.x-request-id: $context.requestId
