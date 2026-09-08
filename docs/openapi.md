@@ -78,7 +78,7 @@ Hoje são três, e a precedência documentada do HTTP API (correspondência exat
    ```yaml
    responses:
      default:
-       description: <o que a borda devolve ao cliente>
+       description: <o que o API Gateway devolve ao cliente>
    ```
    Se o path tiver variável, declare o `parameters` correspondente com `required: true`.
 3. Referencie uma das integrações existentes por `$ref` — ou crie outra em `components.x-amazon-apigateway-integrations` se for um backend novo:
@@ -131,7 +131,7 @@ Declaradas uma única vez em `components.x-amazon-apigateway-integrations` e ref
 **Sobre os parameter mappings, que não são opcionais:**
 
 - `overwrite:path = $request.path` — a integração privada **inclui a porção de stage** no caminho enviado ao backend, e a AWS prescreve esse mapeamento para removê-la. Verificado: a aplicação recebe `/api/customers`, não `/$default/api/customers`.
-- `overwrite:header.x-request-id = $context.requestId` — em **ambas**. Sem ele na integração da Lambda, a função cairia no `awsRequestId` da plataforma e a correlação quebraria justamente na rota que esta borda existe para publicar.
+- `overwrite:header.x-request-id = $context.requestId` — em **ambas**. Sem ele na integração da Lambda, a função cairia no `awsRequestId` da plataforma e a correlação quebraria justamente na rota que este API Gateway existe para publicar.
 
 ## Como o documento é validado
 

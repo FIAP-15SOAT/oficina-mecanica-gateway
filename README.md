@@ -25,8 +25,8 @@ Antes dele a solução **não tinha entrada**: a API no EKS era um `Service` do 
 O que ele **é** dono:
 
 - A **superfície de roteamento pública** — quais métodos e caminhos existem e para onde vão.
-- O **caminho privado** da borda até o cluster, do VPC Link para cima.
-- Os **controles de borda**: limitação de frequência, log de acesso e métricas por rota.
+- O **caminho privado** do API Gateway até o cluster, do VPC Link para cima.
+- Os **controles de API Gateway**: limitação de frequência, log de acesso e métricas por rota.
 
 O que ele **deliberadamente não faz**:
 
@@ -67,14 +67,14 @@ Nada no caminho até o cluster tem endereço público: o balanceador é **intern
 | `POST /api/auth/login` | apenas limitação de frequência própria | API no EKS (`HTTP_PROXY` via VPC Link, payload `1.0`) |
 | `ANY /api/{proxy+}` | todo o resto da API | API no EKS |
 
-> **A regra que evita rediscussão a cada rota nova:** uma rota sai do proxy quando — e apenas quando — o Gateway tem algo específico a dizer sobre ela. Consequência deliberada: um endpoint novo da API fica público **sem passar por este repositório**. É o que elimina o drift entre o contrato da aplicação e o da borda.
+> **A regra que evita rediscussão a cada rota nova:** uma rota sai do proxy quando — e apenas quando — o Gateway tem algo específico a dizer sobre ela. Consequência deliberada: um endpoint novo da API fica público **sem passar por este repositório**. É o que elimina o drift entre o contrato da aplicação e o do API Gateway.
 
 ## 🧰 Stack
 
 | Camada | Tecnologia |
 |---|---|
 | Provisionamento | Terraform ≥ 1.11, provider AWS ≥ 6.46 < 7 |
-| Borda | Amazon API Gateway **HTTP API (v2)**, stage `$default` com `auto_deploy` |
+| API Gateway | Amazon API Gateway **HTTP API (v2)**, stage `$default` com `auto_deploy` |
 | Contrato | OpenAPI 3.0 (`openapi/gateway.yaml`), renderizado por `templatefile()` |
 | Rede | VPC Link V2, security group só de egress |
 | Observabilidade | CloudWatch Logs (log de acesso JSON, 14 dias) + métricas por rota |
@@ -107,7 +107,7 @@ A leitura é direta, sem tratamento que a torne opcional: se um dos contratos n�
 │   ├── openapi.md               # estratégia de contrato e o que vive em cada artefato
 │   ├── terraform.md             # recursos, variáveis, outputs e como aplicar
 │   ├── ci-cd.md                 # os dois workflows job a job e a configuração externa
-│   ├── security.md              # postura da borda e riscos aceitos
+│   ├── security.md              # postura do API Gateway e riscos aceitos
 │   ├── observability.md         # log de acesso, correlação e métricas
 │   ├── adr/                     # decisões arquiteturais
 │   └── diagrams/                # diagramas em PNG, com o XML do draw.io embutido
@@ -194,7 +194,7 @@ A tabela completa de secrets, variables, environments e proteções está em [do
 | 📜 [Contrato OpenAPI](docs/openapi.md) | O que vive no documento e o que vive no Terraform, quando uma rota sai do proxy, como adicionar uma rota |
 | 🌍 [Terraform](docs/terraform.md) | Recursos em nível de HCL, remote states, variáveis, outputs, convenções e como aplicar |
 | 🔄 [CI/CD](docs/ci-cd.md) | Os dois workflows job a job, gates, e a tabela completa de configuração externa |
-| 🔒 [Segurança](docs/security.md) | Postura da borda, o que é controlado agora e os riscos aceitos com gatilho de revisão |
+| 🔒 [Segurança](docs/security.md) | Postura do API Gateway, o que é controlado agora e os riscos aceitos com gatilho de revisão |
 | 📊 [Observabilidade](docs/observability.md) | Log de acesso, correlação fim a fim, atribuição do endereço de origem e granularidade real das métricas |
 | 📐 [ADRs](docs/adr) | [0001 HTTP API em vez de REST](docs/adr/0001-http-api-em-vez-de-rest-api.md) · [0002 Contrato em OpenAPI](docs/adr/0002-contrato-do-gateway-em-openapi.md) · [0003 Integração privada com o EKS](docs/adr/0003-integracao-privada-com-o-eks.md) · [0004 Autenticação permanece nos backends](docs/adr/0004-autenticacao-permanece-nos-backends.md) |
 

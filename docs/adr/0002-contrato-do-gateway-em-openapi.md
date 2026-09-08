@@ -33,7 +33,7 @@ A resposta à pergunta do contexto é, portanto: **sim para a superfície de rot
 
 ### O documento não é a superfície inteira, e isso precisa estar dito
 
-Duas configurações de borda vivem obrigatoriamente no HCL:
+Duas configurações de API Gateway vivem obrigatoriamente no HCL:
 
 | Onde | O que declara |
 |---|---|
@@ -103,7 +103,7 @@ Dois achados dependiam disso: a correlação por `x-request-id` e a remoção da
 
 ### Dois achados adicionais do spike
 
-1. **O import não valida a existência da função Lambda.** O URI apontava para uma função inexistente e a integração foi criada normalmente. Isso confirmou, antes de construir qualquer coisa, que a borda é provisionável antes da função — ver [ADR 0003](0003-integracao-privada-com-o-eks.md) e `docs/terraform.md`.
+1. **O import não valida a existência da função Lambda.** O URI apontava para uma função inexistente e a integração foi criada normalmente. Isso confirmou, antes de construir qualquer coisa, que o API Gateway é provisionável antes da função — ver [ADR 0003](0003-integracao-privada-com-o-eks.md) e `docs/terraform.md`.
 2. **`fail_on_warnings` não é zelo — é o que separa falha de silêncio.** Uma tentativa com URI de integração inválida produziu, **sem** a flag, uma rota criada **sem target** e um `apply` verde. Com `--fail-on-warnings`, a mesma importação virou erro explícito:
    ```
    Unable to create integration for resource at path 'ANY /spike-http/{proxy+}':

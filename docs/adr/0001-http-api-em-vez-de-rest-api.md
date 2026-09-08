@@ -6,7 +6,7 @@ Aceito — 2026-09-07
 
 ## Contexto
 
-A solução Oficina Mecânica precisa de um ponto de entrada público. O Amazon API Gateway oferece duas modalidades incompatíveis entre si, e a escolha entre elas não é de preferência: ela determina o formato de evento entregue à função serverless, se o log de acesso é possível sem criar IAM, e quais controles de borda existem.
+A solução Oficina Mecânica precisa de um ponto de entrada público. O Amazon API Gateway oferece duas modalidades incompatíveis entre si, e a escolha entre elas não é de preferência: ela determina o formato de evento entregue à função serverless, se o log de acesso é possível sem criar IAM, e quais controles de API Gateway existem.
 
 Três fatos do ambiente condicionam a decisão, e nenhum deles é hipótese:
 
@@ -14,7 +14,7 @@ Três fatos do ambiente condicionam a decisão, e nenhum deles é hipótese:
 
 **2. O laboratório bloqueia criação de IAM.** Nenhum repositório do projeto cria `aws_iam_role`; as roles pré-existentes do AWS Academy são lidas por `data`. O log de acesso de **REST API** exige um IAM role **de conta** (`cloudWatchRoleArn`, com a política `AmazonAPIGatewayPushToCloudWatchLogs` e trust em `apigateway.amazonaws.com`). O log de acesso de **HTTP API não exige role algum** — bastam permissões do principal que provisiona (`logs:CreateLogDelivery`, `logs:PutResourcePolicy` e afins).
 
-**3. A validação de schema na borda seria a segunda cópia de um contrato que já existe duas vezes bem.** A API tem uma `ValidationPipe` global com `whitelist` e `forbidNonWhitelisted`; a função serverless valida com `zod` e um teto de 4 KB. Uma terceira validação na borda não acrescenta garantia — acrescenta um artefato que envelhece em silêncio.
+**3. A validação de schema no API Gateway seria a segunda cópia de um contrato que já existe duas vezes bem.** A API tem uma `ValidationPipe` global com `whitelist` e `forbidNonWhitelisted`; a função serverless valida com `zod` e um teto de 4 KB. Uma terceira validação no API Gateway não acrescenta garantia — acrescenta um artefato que envelhece em silêncio.
 
 ## Decisão
 
@@ -23,7 +23,7 @@ Usar **HTTP API (API Gateway v2)**, com stage `$default` e `auto_deploy = true`.
 ### Por que, em ordem de peso
 
 1. **A Lambda já fala payload 2.0.** É o formato exclusivo da modalidade. Escolher REST custaria reescrever uma função que está pronta e testada, ou aceitar telemetria degradada nela.
-2. **Log de acesso sem IAM.** REST exigiria um role que este laboratório não permite criar. As alternativas seriam apostar que o `LabRole` serve, ou abrir mão de log na borda — inaceitável num projeto que tem dois ADRs dedicados a observabilidade.
+2. **Log de acesso sem IAM.** REST exigiria um role que este laboratório não permite criar. As alternativas seriam apostar que o `LabRole` serve, ou abrir mão de log no API Gateway — inaceitável num projeto que tem dois ADRs dedicados a observabilidade.
 3. **Menos Terraform.** Quatro recursos em vez de seis a oito: não há `aws_api_gateway_deployment` nem `triggers` de redeploy, porque `auto_deploy` no stage `$default` cobre o mesmo.
 
 Somam-se três vantagens menores: custo 3,5× menor (US$ 1,00/milhão contra US$ 3,50/milhão nos primeiros 300 milhões), latência menor, e CORS declarativo caso um dia seja necessário.
@@ -48,20 +48,20 @@ HTTP API não oferece *request validation*, WAF, resource policy, endpoint priva
 **Positivas**
 
 - A função serverless entra em produção sem alteração de código.
-- O log de acesso da borda existe sem criar IAM — é o que torna a observabilidade da borda possível neste laboratório.
+- O log de acesso do API Gateway existe sem criar IAM — é o que torna a observabilidade do API Gateway possível neste laboratório.
 - O stack tem quatro recursos e nenhuma máquina de redeploy manual.
 - Custo por requisição 3,5× menor, relevante num crédito de laboratório.
 
 **Negativas e aceitas**
 
-- **Sem validação de schema na borda.** Um corpo malformado atravessa até o backend. É o comportamento desejado: o erro produzido é o do contrato do backend, no formato dele.
+- **Sem validação de schema no API Gateway.** Um corpo malformado atravessa até o backend. É o comportamento desejado: o erro produzido é o do contrato do backend, no formato dele.
 - **Sem WAF.** A única proteção contra volume é o throttling por rota, que é um alvo **agregado** e de melhor esforço — não uma cota por cliente. Registrado em [`security.md`](../security.md).
-- **Sem X-Ray.** A correlação fim a fim é feita pelo `x-request-id` propagado pela borda, não por rastreamento distribuído.
-- **Sem endpoint privado nem resource policy.** A borda é pública por natureza; o que fica privado é o caminho dela até o cluster ([ADR 0003](0003-integracao-privada-com-o-eks.md)).
+- **Sem X-Ray.** A correlação fim a fim é feita pelo `x-request-id` propagado pelo API Gateway, não por rastreamento distribuído.
+- **Sem endpoint privado nem resource policy.** O API Gateway é pública por natureza; o que fica privado é o caminho dela até o cluster ([ADR 0003](0003-integracao-privada-com-o-eks.md)).
 
 ## Gatilho de revisão
 
-Surgir um requisito **real** de WAF, de API keys por cliente, ou de validação de schema na borda como exigência externa. A migração é viável e conhecida: exportar a definição OpenAPI 3.0 do HTTP API e importá-la como REST API. O custo real da virada não é o export — é reescrever a função serverless para payload 1.0 e obter um IAM role de conta para o log de acesso.
+Surgir um requisito **real** de WAF, de API keys por cliente, ou de validação de schema no API Gateway como exigência externa. A migração é viável e conhecida: exportar a definição OpenAPI 3.0 do HTTP API e importá-la como REST API. O custo real da virada não é o export — é reescrever a função serverless para payload 1.0 e obter um IAM role de conta para o log de acesso.
 
 ## Referências
 

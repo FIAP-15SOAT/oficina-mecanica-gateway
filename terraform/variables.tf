@@ -53,43 +53,43 @@ variable "k8s_state_region" {
 }
 
 variable "nlb_listener_port" {
-  description = "Porta TCP do listener do NLB interno provisionado em `oficina-mecanica-k8s`"
+  description = "TCP port of the internal NLB listener provisioned in `oficina-mecanica-k8s`"
   type        = number
   default     = 80
 }
 
 variable "customer_auth_function_name" {
-  description = "Nome da funcao serverless de autenticacao externa de clientes."
+  description = "Name of the serverless function for external customer authentication"
   type        = string
   default     = "lbd-oficina-mecanica-customer-auth"
 }
 
 variable "stage_throttling_rate_limit" {
-  description = "Alvo de requisicoes por segundo aplicado a todas as rotas do stage."
+  description = "Target requests per second applied to every route of the stage"
   type        = number
   default     = 50
 }
 
 variable "stage_throttling_burst_limit" {
-  description = "Capacidade de rajada do throttling padrao do stage"
+  description = "Burst capacity of the default stage throttling"
   type        = number
   default     = 100
 }
 
 variable "login_throttling_rate_limit" {
-  description = "Alvo de requisicoes por segundo das duas rotas de login"
+  description = "Target requests per second for the two login routes"
   type        = number
   default     = 5
 }
 
 variable "login_throttling_burst_limit" {
-  description = "Capacidade de rajada do throttling das duas rotas de login"
+  description = "Burst capacity of the throttling for the two login routes"
   type        = number
   default     = 10
 }
 
 variable "access_log_retention_in_days" {
-  description = "Retencao do log de acesso da borda em dias, alinhada a retencao do log group do control plane do EKS"
+  description = "Access log retention in days, aligned with the EKS control plane log group retention"
   type        = number
   default     = 14
 }
