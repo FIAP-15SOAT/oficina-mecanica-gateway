@@ -66,7 +66,7 @@ Os valores são lidos **sem tratamento que os torne opcionais**: se um contrato 
 | `aws_apigatewayv2_vpc_link.vpclink` | `api_gateway.tf` | Cria as ENIs nas subnets privadas. **Imutável**: subnets e security groups não podem ser alterados depois — mudá-los substitui o recurso |
 | `aws_apigatewayv2_api.api` | `api_gateway.tf` | A HTTP API. `body` renderizado de `openapi/gateway.yaml` por `templatefile()`, com `fail_on_warnings = true` |
 | `aws_apigatewayv2_stage.default` | `api_gateway.tf` | Stage `$default` com `auto_deploy`, throttling, métricas e log de acesso |
-| `aws_cloudwatch_log_group.cw_lg_api_access` | `cloudwatch.tf` | Log de acesso da borda, retenção alinhada à do log group do control plane do EKS |
+| `aws_cloudwatch_log_group.cw_lg_api_access` | `cloudwatch.tf` | Log de acesso do API Gateway, retenção alinhada à do log group do control plane do EKS |
 
 **Não existem** `aws_apigatewayv2_route` nem `aws_apigatewayv2_integration` avulsos: eles conflitariam com o `body`. Rotas e integrações vêm do documento OpenAPI — ver [openapi.md](openapi.md).
 
@@ -112,7 +112,7 @@ Nenhuma exige valor externo além das credenciais — todas têm default.
 
 ## O contrato consumido pelo repositório da função serverless
 
-O `aws_lambda_permission` **não** é criado aqui: ele fica no repositório dono da função. Só a permissão exige que a função exista (`lambda:AddPermission` devolve `ResourceNotFoundException`), e movê-la para lá permite que esta borda seja provisionada **uma vez, completa**, sem revisita.
+O `aws_lambda_permission` **não** é criado aqui: ele fica no repositório dono da função. Só a permissão exige que a função exista (`lambda:AddPermission` devolve `ResourceNotFoundException`), e movê-la para lá permite que este API Gateway seja provisionada **uma vez, completa**, sem revisita.
 
 Delegar sem entregar o contrato seria delegar pela metade. A forma exata, para não precisar ser inferida:
 
@@ -139,7 +139,7 @@ resource "aws_lambda_permission" "allow_api_gateway" {
 
 > ⚠️ **Recriar a API muda o `api_execution_arn`**, invalidando a permissão. Ela precisa ser reaplicada no repositório da função.
 
-**Enquanto a função não existir**, a rota é uma entrega parcial reconhecida: ela existe e devolve `500` com erro de integração no log de acesso, e o restante da API funciona normalmente. Foi verificado que o import **não valida a existência da função**, então a borda é provisionável antes dela.
+O import **não valida a existência da função**, então este API Gateway é provisionável antes dela — o que fixa a ordem de aplicação: o API Gateway primeiro, a função depois. A stack da função lê o `api_execution_arn` desta para escopar a permissão.
 
 ## Convenções de nome e tags
 

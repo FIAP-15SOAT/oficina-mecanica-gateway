@@ -8,7 +8,7 @@ Depende do [ADR 0001](0001-http-api-em-vez-de-rest-api.md): VPC Link **V2** é o
 
 ## Contexto
 
-A API roda no EKS como um `Service` do tipo `ClusterIP`, sem Ingress e sem load balancer. Publicá-la pela borda exige um caminho de rede que atravesse a fronteira do API Gateway até dentro da VPC — e a plataforma restringe severamente esse caminho.
+A API roda no EKS como um `Service` do tipo `ClusterIP`, sem Ingress e sem load balancer. Publicá-la pelo API Gateway exige um caminho de rede que atravesse a fronteira do API Gateway até dentro da VPC — e a plataforma restringe severamente esse caminho.
 
 **A integração privada aceita apenas o ARN do listener de um ALB/NLB, ou o ARN de um serviço do Cloud Map.** Não existe apontar para um IP arbitrário na VPC. Um balanceador, portanto, é **obrigatório** — a pergunta não é *se*, é *qual* e *onde ele mora*.
 
@@ -27,8 +27,8 @@ Três fatos do ambiente moldam o resto da decisão:
 ### Por que o balanceador não está neste repositório
 
 1. **Ownership segue os recursos que precisam ser mutados.** O `aws_autoscaling_attachment` precisa do ASG do managed node group; a regra de ingress precisa do security group gerenciado do cluster. Os dois são recursos do stack de Kubernetes. Colocar o balanceador lá **elimina a única invasão de fronteira do desenho inteiro**.
-2. **A substituição do node group não é hipótese.** Com o balanceador aqui, toda substituição deixaria o `aws_autoscaling_attachment` apontando para um ASG que não existe mais, e a borda responderia mal **em silêncio, até alguém provisionar o outro repositório**. Com ele lá, um único `apply` resolve os dois lados.
-3. **É camada de plataforma.** "Como o tráfego entra no cluster" está no mesmo nível de abstração que o `metrics-server` — não no nível da borda pública.
+2. **A substituição do node group não é hipótese.** Com o balanceador aqui, toda substituição deixaria o `aws_autoscaling_attachment` apontando para um ASG que não existe mais, e o API Gateway responderia mal **em silêncio, até alguém provisionar o outro repositório**. Com ele lá, um único `apply` resolve os dois lados.
+3. **É camada de plataforma.** "Como o tráfego entra no cluster" está no mesmo nível de abstração que o `metrics-server` — não no nível do API Gateway.
 
 O grafo de dependências resultante não tem ciclos:
 
@@ -48,7 +48,7 @@ Duas remote states diretas no Gateway, em vez de fazer `k8s` reexportar os outpu
 
 **Health check HTTP em `/api/health/ready`.** É o mesmo endpoint da `readinessProbe` do Kubernetes, então "pronto" significa a mesma coisa nos dois lugares — inclusive alcançar o banco. Com o matcher padrão `200-399`, o `503` da prontidão marca o alvo como não saudável.
 
-**Listener TCP:80.** Sem TLS entre a borda e o backend dentro da VPC. Coerente com a postura atual do cluster, que também não tem TLS interno.
+**Listener TCP:80.** Sem TLS entre o API Gateway e o backend dentro da VPC. Coerente com a postura atual do cluster, que também não tem TLS interno.
 
 **`overwrite:path = $request.path` na integração.** A AWS documenta que a integração privada **inclui a porção de stage no caminho** enviado ao backend, e prescreve esse mapeamento para removê-la. Não é precaução: é correção de um comportamento documentado.
 
@@ -61,8 +61,8 @@ A consequência precisa estar escrita em vez de ser descoberta:
 | Situação | `/api/health/live` | `/api/health/ready` | Quem produz a resposta |
 |---|---|---|---|
 | Aplicação saudável | `200` | `200` | aplicação |
-| Banco fora do ar | `200` | `503` | **aplicação** — não é `5xx` da borda |
-| VPC Link inativo, listener ausente, conexão recusada | `5xx` | `5xx` | **borda** |
+| Banco fora do ar | `200` | `503` | **aplicação** — não é `5xx` do API Gateway |
+| VPC Link inativo, listener ausente, conexão recusada | `5xx` | `5xx` | **API Gateway** |
 
 Por isso a verificação externa documentada em [`ci-cd.md`](../ci-cd.md) usa **prontidão**, e não vivacidade: `/live` responderia `200` com a solução inutilizável, e quem verificasse concluiria por sucesso. `/live` permanece útil como diagnóstico — é o que separa a linha 2 da linha 3 da tabela.
 
@@ -83,7 +83,7 @@ Por isso a verificação externa documentada em [`ci-cd.md`](../ci-cd.md) usa **
 - **AWS Load Balancer Controller.** Exige IRSA, bloqueado no laboratório.
 - **ALB interno com roteamento por path.** Mesmo preço e mais peças, para um benefício — roteamento por path — que só aparece quando existir um segundo backend no cluster.
 - **Cloud Map com IPs de pod.** Os pods têm IP roteável na VPC, mas nada os registra automaticamente sem ECS ou um controller adicional.
-- **Expor a API publicamente** (ALB internet-facing, ou `Service` do tipo `LoadBalancer` público). Contradiz frontalmente a postura documentada de manter o cluster sem exposição direta, e tornaria a borda **contornável** — o que anularia o throttling e o log de acesso.
+- **Expor a API publicamente** (ALB internet-facing, ou `Service` do tipo `LoadBalancer` público). Contradiz frontalmente a postura documentada de manter o cluster sem exposição direta, e tornaria o API Gateway **contornável** — o que anularia o throttling e o log de acesso.
 
 ### Sobre o security group do balanceador
 
@@ -103,7 +103,7 @@ O NLB é criado **sem** security group, e um NLB criado sem SG **não pode receb
 
 - **O fail-open não protege quando só existe um nó.** Mitigação real exigiria mais de um nó, fora do orçamento. O que a decisão faz é **documentar** o comportamento e escolher o endpoint de verificação que o distingue.
 - **Custo recorrente do NLB**: ~US$ 0,0225/h ≈ **US$ 0,54/dia**, e isso é **piso** — faltam NLCUs e eventual tráfego inter-AZ. Não há interruptor por recurso: o balanceador é pré-requisito de qualquer chamada à API, e um ambiente sem ele não é mais barato, é um ambiente sem ponto de entrada. O controle de custo é o ciclo de vida do ambiente inteiro — provisionar para testar e `terraform destroy` ao final.
-- **Sem TLS entre a borda e o backend** dentro da VPC.
+- **Sem TLS entre o API Gateway e o backend** dentro da VPC.
 - **O VPC Link fica `INACTIVE` após 60 dias sem tráfego** e a AWS remove as ENIs; a reativação leva alguns minutos. Num laboratório intermitente, isso vai acontecer — por isso o procedimento de verificação instrui a repetir a tentativa antes de concluir por falha.
 - **A ordem de aplicação e de rollback passa a importar** entre três repositórios. Registrada em [`architecture.md`](../architecture.md).
 

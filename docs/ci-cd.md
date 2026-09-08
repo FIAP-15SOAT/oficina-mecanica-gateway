@@ -55,7 +55,7 @@ npx --yes @redocly/cli@1.34.2 lint openapi/gateway.yaml \
 
 | Regra pulada | Por quê |
 |---|---|
-| `security-defined` | A borda não declara `security` porque **não autentica** — ver [ADR 0004](adr/0004-autenticacao-permanece-nos-backends.md) |
+| `security-defined` | O API Gateway não declara `security` porque **não autentica** — ver [ADR 0004](adr/0004-autenticacao-permanece-nos-backends.md) |
 | `no-empty-servers` | O endereço só existe depois do provisionamento; exigi-lo seria versionar um valor que o Terraform produz |
 | `operation-operationId` | Serve a geradores de cliente, que este documento não alimenta |
 
@@ -94,7 +94,7 @@ Um único job, `terraform-gateway`, sob o environment `production`.
 
 ## Verificação externa após o provisionamento
 
-**Não é um passo do pipeline** — é procedimento manual, e o CD tem a mesma forma dos demais repositórios de infraestrutura. A contrapartida é explícita: **um CD verde não é evidência de que a solução responde de fora.** Cobrir DNS, TLS, borda e balanceador depende de alguém executar o que está abaixo.
+**Não é um passo do pipeline** — é procedimento manual, e o CD tem a mesma forma dos demais repositórios de infraestrutura. A contrapartida é explícita: **um CD verde não é evidência de que a solução responde de fora.** Cobrir DNS, TLS, API Gateway e balanceador depende de alguém executar o que está abaixo.
 
 ```bash
 cd terraform
@@ -109,7 +109,7 @@ curl -i "$EP/api/health/ready"
 | Resposta | Significado |
 |---|---|
 | `200` | Caminho completo saudável |
-| `503` com envelope da aplicação | A borda e a rede estão bem; a aplicação não está pronta (banco, tipicamente) |
+| `503` com envelope da aplicação | O API Gateway e a rede estão bem; a aplicação não está pronta (banco, tipicamente) |
 | `5xx` com `{"message":"..."}` | Falha do **caminho de rede**: VPC Link inativo, listener ausente, conexão recusada |
 | sem resposta / timeout longo | Ver abaixo |
 
@@ -119,7 +119,7 @@ curl -i "$EP/api/health/ready"
 # 2. Um caminho não publicado precisa ser recusado PELA BORDA
 curl -i "$EP/__caminho-nao-publicado__"     # espera-se 404 {"message":"Not Found"}
 
-# 3. Uma rota protegida sem credencial: o 401 vem da APLICAÇÃO, não da borda
+# 3. Uma rota protegida sem credencial: o 401 vem da APLICAÇÃO, não do API Gateway
 curl -i "$EP/api/customers"                  # espera-se 401 com o envelope da API
 
 # 4. Os mappings no recurso provisionado, não apenas no documento versionado
@@ -127,7 +127,15 @@ aws apigatewayv2 get-integrations --api-id "$(terraform output -raw api_id)" \
   --query 'Items[].[IntegrationType,PayloadFormatVersion,RequestParameters]'
 ```
 
-> **`POST /customer-auth/login` fica fora desta verificação enquanto a função serverless não existir.** Ela responde `500` com erro de integração **por desenho** — é a Fase A, entrega parcial reconhecida, e não indica falha do provisionamento.
+```bash
+# 5. A rota de autenticação externa é atendida pela função serverless: uma
+#    credencial estruturalmente válida e inexistente precisa receber 401
+curl -i -X POST "$EP/customer-auth/login"   -H 'content-type: application/json'   -d '{"cpf":"123.456.789-09","password":"nao-importa"}'
+```
+
+> Um `500` com `integrationError` sobre permissão aqui aponta a
+> `aws_lambda_permission`, que vive no repositório da função — recriar esta API
+> muda o `api_execution_arn` e invalida a permissão.
 
 ## Configuração externa
 
