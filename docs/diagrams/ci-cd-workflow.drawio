@@ -1,0 +1,96 @@
+<mxGraphModel dx="1200" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0" adaptiveColors="auto">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+
+    <mxCell id="ci-container" value="CI — ci.yml" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#4C9AFF;strokeWidth=2;dashed=1;verticalAlign=top;fontSize=16;fontStyle=1;align=left;spacingLeft=16;spacingTop=8;fontColor=#4C9AFF;" vertex="1" parent="1">
+      <mxGeometry x="40" y="40" width="640" height="620" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="ci-trigger" value="push&#10;feature/** · fix/**" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F0FF;strokeColor=#4C9AFF;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="240" y="90" width="240" height="50" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="ci-conc" value="concurrency: ci-&amp;lt;ref&amp;gt;&#10;cancel-in-progress: true" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#8C9BAB;dashed=1;fontSize=11;fontColor=#5E6C7F;" vertex="1" parent="1">
+      <mxGeometry x="500" y="92" width="160" height="46" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="job-tf" value="&lt;b&gt;tf-validate&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;div align=&quot;left&quot;&gt;• terraform fmt -check -recursive&lt;br&gt;• terraform init -backend=false&lt;br&gt;• terraform validate&lt;br&gt;• configure AWS credentials&lt;br&gt;&amp;nbsp;&amp;nbsp;&lt;i&gt;continue-on-error&lt;/i&gt;&lt;br&gt;• terraform plan &lt;i&gt;(se houver credencial)&lt;/i&gt;&lt;br&gt;• nota no resumo &lt;i&gt;(se não houver)&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F8;strokeColor=#5E6C7F;fontSize=12;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+      <mxGeometry x="80" y="200" width="270" height="180" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="job-oas" value="&lt;b&gt;openapi-lint&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;div align=&quot;left&quot;&gt;• redocly lint openapi/gateway.yaml&lt;br&gt;&amp;nbsp;&amp;nbsp;--extends=minimal&lt;br&gt;&amp;nbsp;&amp;nbsp;&lt;i&gt;validação estrutural ligada&lt;/i&gt;&lt;br&gt;&amp;nbsp;&amp;nbsp;&lt;i&gt;3 regras de estilo puladas&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F8;strokeColor=#5E6C7F;fontSize=12;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+      <mxGeometry x="380" y="200" width="270" height="180" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="job-pr" value="&lt;b&gt;open-pr&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;div align=&quot;left&quot;&gt;• gera GitHub App token&lt;br&gt;• abre PR para main &lt;i&gt;se não existir&lt;/i&gt;&lt;br&gt;&amp;nbsp;&amp;nbsp;&lt;i&gt;idempotente&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F8;strokeColor=#5E6C7F;fontSize=12;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+      <mxGeometry x="230" y="450" width="270" height="130" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#4C9AFF;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="ci-trigger" target="job-tf">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#4C9AFF;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="ci-trigger" target="job-oas">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e3" value="needs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#4C9AFF;strokeWidth=2;endArrow=block;fontSize=11;fontColor=#4C9AFF;" edge="1" parent="1" source="job-tf" target="job-pr">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e4" value="needs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#4C9AFF;strokeWidth=2;endArrow=block;fontSize=11;fontColor=#4C9AFF;" edge="1" parent="1" source="job-oas" target="job-pr">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="cd-container" value="CD — cd.yml" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#36B37E;strokeWidth=2;dashed=1;verticalAlign=top;fontSize=16;fontStyle=1;align=left;spacingLeft=16;spacingTop=8;fontColor=#36B37E;" vertex="1" parent="1">
+      <mxGeometry x="740" y="40" width="620" height="620" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="cd-trigger" value="push na main&#10;ou workflow_dispatch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3FCEF;strokeColor=#36B37E;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="900" y="90" width="240" height="50" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="cd-conc" value="concurrency: production&#10;cancel-in-progress: false&#10;(enfileira, não cancela)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#8C9BAB;dashed=1;fontSize=11;fontColor=#5E6C7F;" vertex="1" parent="1">
+      <mxGeometry x="1170" y="86" width="170" height="58" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="cd-gate" value="&lt;b&gt;gate&lt;/b&gt;&#10;vars.ENABLE_DEPLOY == &#39;true&#39;&#10;OU workflow_dispatch" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF7E6;strokeColor=#FF991F;fontSize=12;" vertex="1" parent="1">
+      <mxGeometry x="880" y="200" width="280" height="120" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="cd-skip" value="skipped&#10;nada é provisionado" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F6F8;strokeColor=#8C9BAB;dashed=1;fontSize=12;fontColor=#5E6C7F;" vertex="1" parent="1">
+      <mxGeometry x="1180" y="230" width="160" height="60" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="job-cd" value="&lt;b&gt;terraform-gateway&lt;/b&gt;&lt;br&gt;&lt;i&gt;environment: production&lt;/i&gt;&lt;br&gt;&lt;br&gt;&lt;div align=&quot;left&quot;&gt;• configure AWS credentials&lt;br&gt;• terraform init&lt;br&gt;• terraform validate&lt;br&gt;• terraform plan&lt;br&gt;• terraform apply -auto-approve&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3FCEF;strokeColor=#36B37E;fontSize=12;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
+      <mxGeometry x="880" y="390" width="280" height="160" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="cd-manual" value="verificação externa&#10;é &lt;b&gt;manual&lt;/b&gt; — ver ci-cd.md" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#FF991F;dashed=1;fontSize=11;fontColor=#B36B00;" vertex="1" parent="1">
+      <mxGeometry x="880" y="580" width="280" height="50" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#36B37E;strokeWidth=2;endArrow=block;" edge="1" parent="1" source="cd-trigger" target="cd-gate">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e6" value="sim" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#36B37E;strokeWidth=2;endArrow=block;fontSize=11;fontColor=#36B37E;" edge="1" parent="1" source="cd-gate" target="job-cd">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e7" value="não" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#8C9BAB;strokeWidth=2;endArrow=block;dashed=1;fontSize=11;fontColor=#5E6C7F;" edge="1" parent="1" source="cd-gate" target="cd-skip">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#FF991F;strokeWidth=1;endArrow=none;dashed=1;" edge="1" parent="1" source="job-cd" target="cd-manual">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="bridge" value="merge do PR" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#5E6C7F;strokeWidth=2;endArrow=block;dashed=1;fontSize=12;fontColor=#5E6C7F;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="job-pr" target="cd-trigger">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="legend" value="&lt;div align=&quot;left&quot;&gt;&lt;b&gt;Legenda&lt;/b&gt;&lt;br&gt;━━ dependência &lt;i&gt;needs:&lt;/i&gt; entre jobs&lt;br&gt;╌╌ caminho condicional ou nota&lt;br&gt;◇ gate de habilitação&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAFBFC;strokeColor=#C1C7D0;fontSize=11;verticalAlign=top;spacingTop=6;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="40" y="690" width="330" height="90" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="title" value="Oficina Mecânica — Gateway · Workflows de CI e CD" style="text;html=1;align=center;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#253858;" vertex="1" parent="1">
+      <mxGeometry x="440" y="700" width="600" height="40" as="geometry"/>
+    </mxCell>
+  </root>
+</mxGraphModel>
