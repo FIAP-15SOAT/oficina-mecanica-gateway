@@ -6,6 +6,11 @@
 crash.log
 crash.*.log
 
+# Fontes dos diagramas: o PNG exportado carrega o XML embutido (draw.io -e),
+# entao ele proprio e o artefato editavel -- versionar o .drawio duplicaria a fonte
+*.drawio
+*.drawio.bkp
+
 # IDEs and OS
 .DS_Store
 .vscode/

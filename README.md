@@ -110,7 +110,7 @@ A leitura é direta, sem tratamento que a torne opcional: se um dos contratos n�
 │   ├── security.md              # postura da borda e riscos aceitos
 │   ├── observability.md         # log de acesso, correlação e métricas
 │   ├── adr/                     # decisões arquiteturais
-│   └── diagrams/                # diagramas versionados (.drawio) e exportados
+│   └── diagrams/                # diagramas em PNG, com o XML do draw.io embutido
 ├── openapi/
 │   └── gateway.yaml             # a superfície de roteamento pública
 └── terraform/
