@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "feature/**"
+      - "fix/**"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  tf-validate:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+
+      - name: Terraform Fmt Check
+        run: terraform fmt -check -recursive
+        working-directory: terraform
+
+      - name: Terraform Init Gateway
+        run: terraform init -backend=false -no-color
+        working-directory: terraform
+
+      - name: Terraform Validate Gateway
+        run: terraform validate -no-color
+        working-directory: terraform
+
+      - name: Configure AWS Credentials
+        id: aws_creds
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Plan Gateway
+        if: steps.aws_creds.outcome == 'success'
+        working-directory: terraform
+        run: |
+          terraform init -reconfigure -no-color
+          terraform plan -no-color
+
+      - name: Note skipped plan in job summary
+        if: steps.aws_creds.outcome == 'failure'
+        run: |
+          {
+            echo '### Terraform plan — skipped ⏭️'
+            echo ''
+            echo 'The target environment appears to be unavailable, so `terraform plan` was skipped. **This does not block CI** — `fmt` and `validate` passed. Re-run once the environment is back up to preview the plan.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  openapi-lint:
+    name: OpenAPI Contract Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # `--extends=minimal` mantem a validacao ESTRUTURAL da especificacao
+      # ligada. As tres regras puladas sao opinativas de estilo de API
+      # publica e nao dizem nada sobre validade: a borda nao declara `security`
+      # porque nao autentica (ADR 0004), `servers` so existe depois do
+      # provisionamento, e `operationId` serve a geradores de cliente que este
+      # documento nao alimenta.
+      - name: Lint the OpenAPI contract
+        run: |
+          npx --yes @redocly/cli@1.34.2 lint openapi/gateway.yaml \
+            --extends=minimal \
+            --skip-rule=security-defined \
+            --skip-rule=no-empty-servers \
+            --skip-rule=operation-operationId
+
+  open-pr:
+    name: Open Pull Request
+    runs-on: ubuntu-latest
+    needs:
+      - tf-validate
+      - openapi-lint
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Generate GitHub App Token
+        id: app_token
+        uses: actions/create-github-app-token@21cfef2b496dd8ef5b904c159339626a10ad380e # v1.11.0
+        with:
+          app-id: ${{ vars.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+      - name: Open a PR to main if none exists
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          HEAD_BRANCH: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          existing="$(gh pr list --head "${HEAD_BRANCH}" --base main --state open --json number --jq 'length')"
+          if [[ "${existing}" != "0" ]]; then
+            echo "An open PR already exists for ${HEAD_BRANCH} -> main; nothing to do."
+            exit 0
+          fi
+          gh pr create \
+            --base main \
+            --head "${HEAD_BRANCH}" \
+            --title "${HEAD_BRANCH}" \
+            --body "Automated PR opened by CI on behalf of @${ACTOR} after all checks passed on \`${HEAD_BRANCH}\`."

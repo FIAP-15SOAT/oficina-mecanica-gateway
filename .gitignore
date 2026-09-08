@@ -1,0 +1,23 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfplan
+crash.log
+crash.*.log
+
+# IDEs and OS
+.DS_Store
+.vscode/
+.idea/
+
+# Agents and local tools
+CLAUDE.md
+.claude
+.codex
+.agent
+.agents
+.github/*
+!.github/workflows/
+!.github/actions/
+openspec/
