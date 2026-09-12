@@ -10,7 +10,7 @@ Como uma requisição atravessa o API Gateway até cada backend, quem pode falar
 - [Ordem de aplicação e de rollback](#ordem-de-aplicação-e-de-rollback)
 - [Falhas conhecidas](#falhas-conhecidas)
 
-<p align="center"><img src="diagrams/infrastructure.png" alt="Diagrama de infraestrutura: cliente na internet acessa por HTTPS o API Gateway HTTP API v2, que publica POST /customer-auth/login, POST /api/auth/login e ANY /api/{proxy+}. A rota de autenticacao de clientes vai por AWS_PROXY para a Lambda; as demais atravessam o VPC Link V2 ate ENIs nas duas subnets privadas (10.0.10.0/24 em us-east-1a e 10.0.11.0/24 em us-east-1b) da VPC 10.0.0.0/16, chegam ao NLB interno com listener TCP:80, cross-zone habilitado e health check HTTP em /api/health/ready, e dali a NodePort 30080 do no EC2, ao Service oficina-api e ao Pod. O Pod alcanca o Amazon RDS PostgreSQL 16 fora do cluster na porta 5432. As subnets publicas 10.0.0.0/24 e 10.0.1.0/24 hospedam NAT Gateway e Internet Gateway, usados apenas para egresso. O log de acesso vai para CloudWatch Logs com 14 dias de retencao. O security group do VPC Link tem apenas egress TCP 80 para a CIDR da VPC, e o do cluster libera ingress TCP 30080 a partir da CIDR da VPC" width="100%"></p>
+![Arquitetura do gateway: HTTP API, rotas de login, proxy privado por VPC Link e NLB, Lambda, CloudWatch e states consumidos](diagrams/infrastructure.png)
 
 ## O caminho de uma requisição
 
@@ -50,12 +50,12 @@ API Gateway
   │  sobrescreve x-request-id = $context.requestId
   │  monta o evento no formato payload 2.0
   ▼
-função serverless (invocação direta, sem VPC)
+função serverless (invocação de serviço; execução nas subnets privadas)
 ```
 
 ### O que o API Gateway produz por conta própria
 
-Estas respostas **não** seguem o envelope de erro dos backends — são do API Gateway, no formato dela (`{"message":"..."}`):
+Estas respostas **não** seguem o envelope de erro dos backends — são do API Gateway, no formato dele (`{"message":"..."}`):
 
 | Situação | Resposta |
 |---|---|
@@ -104,20 +104,25 @@ Sem ciclos. São **duas** remote states diretas aqui, em vez de fazer `k8s` reex
 ## Ordem de aplicação e de rollback
 
 ```text
-1. oficina-mecanica-infra-base             VPC e subnets
-2. oficina-mecanica-infra-k8s              cluster, node group e o caminho privado
-3. oficina-mecanica-api                    Service NodePort + deploy da aplicação
-4. oficina-mecanica-api-gateway            este API Gateway
-5. oficina-mecanica-lambda-customer-auth  função + aws_lambda_permission
+1. oficina-mecanica-infra-base             VPC, subnets e NAT
+2. oficina-mecanica-infra-database         RDS e segredo de credenciais
+3. oficina-mecanica-infra-k8s              EKS, NLB e NodePort do caminho privado
+4. oficina-mecanica-api                    migrations + Service NodePort + aplicação
+5. oficina-mecanica-api-gateway            HTTP API e VPC Link
+6. oficina-mecanica-lambda-customer-auth   função + segredo de assinatura + permissão
+7. oficina-mecanica-custom-monitoring     dashboards, alertas e Synthetic
 ```
 
-**O rollback é a ordem inversa, e ela importa** — não são passos independentes:
+**A remoção do ambiente segue as dependências em ordem inversa.** Database e Kubernetes podem ser provisionados em paralelo depois da rede; a API não é uma stack Terraform e precisa do banco migrado para estar pronta. Os states do gateway e do banco precisam existir antes de aplicar a Lambda.
 
 ```text
-1. gateway: terraform destroy       remove rotas, integrações e VPC Link
-2. lambda:  remover aws_lambda_permission, se já existir
-3. k8s:     terraform destroy       remove NLB, target group, listener e vínculo
-4. app:     Service NodePort → ClusterIP
+1. monitoring: terraform destroy    remove consumidores do endpoint do gateway
+2. lambda:     terraform destroy    remove função, permissão e segredo de assinatura
+3. gateway:    terraform destroy    remove rotas, integrações e VPC Link
+4. API:        remover workloads    antes de remover a plataforma
+5. k8s:        terraform destroy    remove EKS, NLB, target group e listener
+6. database:   terraform destroy    remove RDS e segredo de credenciais
+7. infra-base: terraform destroy    remove NAT e rede após seus consumidores
 ```
 
 Três acoplamentos que essa ordem respeita:
@@ -126,7 +131,7 @@ Três acoplamentos que essa ordem respeita:
 - Remover o caminho privado antes de destruir o Gateway deixa a integração apontando para um listener inexistente.
 - **Recriar a API muda o `api_execution_arn`**, invalidando a `aws_lambda_permission` que vive no repositório da função — ela precisa ser reaplicada.
 
-Nenhum passo é destrutivo para dados.
+O destroy de database apaga os dados: backups estão desabilitados, não há snapshot final nem proteção de exclusão. O destroy da Lambda também remove imediatamente o contêiner da chave privada (`recovery_window_in_days = 0`). Para reverter apenas uma implantação, use o roteiro de reversão do [CD da Lambda](https://github.com/FIAP-15SOAT/oficina-mecanica-lambda-customer-auth/blob/main/docs/ci-cd.md#reversão) ou da API, sem destruir o banco.
 
 ## Falhas conhecidas
 
@@ -146,7 +151,7 @@ aws cloudwatch get-metric-statistics --namespace AWS/NetworkELB \
   --start-time <inicio> --end-time <fim> --period 60 --statistics Sum
 ```
 
-Zero fluxos com o alvo `healthy` e o VPC Link `AVAILABLE` significa **esperar**. Se o quadro persistir por mais de ~10 minutos, aí sim investigue o egress do security group.
+Zero fluxos com o alvo `healthy` e o VPC Link `AVAILABLE` pode indicar propagação do caminho privado. Repita a tentativa e confira também listener, target group e egress; essas métricas isoladas não provam a causa nem um prazo garantido de recuperação.
 
 ### 2. O VPC Link fica `INACTIVE` após 60 dias sem tráfego
 
@@ -189,15 +194,15 @@ aws sts get-caller-identity
 
 Renove as três variáveis — incluindo o **`aws_session_token`**, que é sempre exigido no Academy e é o mais fácil de esquecer — e atualize os secrets do repositório.
 
-## Comportamentos confirmados no ambiente provisionado
+## Comportamentos das integrações
 
-Registrados como **observados**, não como esperados:
+Os seguintes resultados orientam o diagnóstico. A inspeção do recurso provisionado e a chamada real continuam necessárias depois de cada criação; o código local não comprova que o laboratório esteja ativo:
 
 | Comportamento | Observação |
 |---|---|
 | Porção de stage no caminho | A aplicação recebe `url.path = /api/customers`, **sem** porção de stage — o mapeamento `overwrite:path` cumpre o papel |
 | Endereço de origem na aplicação | `client.address` é a ENI do NLB (`::ffff:10.0.10.x`), **não** o cliente. Ver [observability.md](observability.md) |
-| Parameter mappings no recurso | `overwrite:path` e `overwrite:header.x-request-id` presentes nas duas integrações, verificados por `aws apigatewayv2 get-integrations` |
+| Parameter mappings no recurso | `overwrite:path` somente em `eks`; `overwrite:header.x-request-id` declarado em `eks` e `lambda`. Conferir com `aws apigatewayv2 get-integrations` |
 | Rota protegida sem credencial | `401` produzido **pela API**, com o envelope dela |
 | Caminho não publicado | `404` produzido **pelo API Gateway** |
 | `POST /customer-auth/login` com credencial inexistente | `401` produzido **pela função serverless**, com o envelope dela. A rota não declara autorizador próprio, então o `401` só pode ter vindo dela |

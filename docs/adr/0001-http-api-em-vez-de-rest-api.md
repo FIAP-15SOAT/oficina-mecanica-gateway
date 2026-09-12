@@ -24,7 +24,7 @@ Usar **HTTP API (API Gateway v2)**, com stage `$default` e `auto_deploy = true`.
 
 1. **A Lambda já fala payload 2.0.** É o formato exclusivo da modalidade. Escolher REST custaria reescrever uma função que está pronta e testada, ou aceitar telemetria degradada nela.
 2. **Log de acesso sem IAM.** REST exigiria um role que este laboratório não permite criar. As alternativas seriam apostar que o `LabRole` serve, ou abrir mão de log no API Gateway — inaceitável num projeto que tem dois ADRs dedicados a observabilidade.
-3. **Menos Terraform.** Quatro recursos em vez de seis a oito: não há `aws_api_gateway_deployment` nem `triggers` de redeploy, porque `auto_deploy` no stage `$default` cobre o mesmo.
+3. **Menos Terraform.** Cinco recursos explícitos nesta stack, sem os recursos de deployment da REST API: não há `aws_api_gateway_deployment` nem `triggers` de redeploy, porque `auto_deploy` no stage `$default` cobre o mesmo.
 
 Somam-se três vantagens menores: custo 3,5× menor (US$ 1,00/milhão contra US$ 3,50/milhão nos primeiros 300 milhões), latência menor, e CORS declarativo caso um dia seja necessário.
 
@@ -34,7 +34,7 @@ HTTP API não oferece *request validation*, WAF, resource policy, endpoint priva
 
 - **Validação de schema**: ver o fato 3 do contexto. Ela permanece nos backends, que a fazem bem.
 - **WAF**: não há requisito de proteção contra tráfego adversário além do throttling.
-- **X-Ray**: o rastreamento distribuído do projeto é OpenTelemetry na aplicação, e está desligado por decisão do [ADR 0005 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/adr/0005-opentelemetry.md).
+- **X-Ray**: o rastreamento distribuído do projeto é OpenTelemetry na aplicação, e a coleta é controlada pelo gate de telemetria do CD da API, conforme o [ADR 0005 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/adr/0005-opentelemetry.md).
 - **API keys / usage plans**: os consumidores são clientes portadores de JWT, não integrações identificadas por chave.
 
 ## Alternativas consideradas e descartadas
@@ -49,7 +49,7 @@ HTTP API não oferece *request validation*, WAF, resource policy, endpoint priva
 
 - A função serverless entra em produção sem alteração de código.
 - O log de acesso do API Gateway existe sem criar IAM — é o que torna a observabilidade do API Gateway possível neste laboratório.
-- O stack tem quatro recursos e nenhuma máquina de redeploy manual.
+- O stack tem cinco recursos e nenhuma máquina de redeploy manual.
 - Custo por requisição 3,5× menor, relevante num crédito de laboratório.
 
 **Negativas e aceitas**

@@ -18,6 +18,11 @@ Os dois workflows job a job, os gates que os protegem, a tabela completa de conf
 | [`ci.yml`](../.github/workflows/ci.yml) | `push` em `feature/**` e `fix/**` | `ci-<ref>`, **cancela** execuções obsoletas | Valida Terraform e o contrato OpenAPI, tenta um `plan`, abre o PR |
 | [`cd.yml`](../.github/workflows/cd.yml) | `push` na `main` ou **Run workflow** | `production`, **não cancela** — enfileira | Provisiona sob o environment `production` |
 
+As permissões do `GITHUB_TOKEN` são `contents: read`; a abertura do PR usa o
+token efêmero do GitHub App instalado com permissão para criar Pull Requests.
+O environment `production` fornece seu escopo de execução; reviewers não são
+pré-requisito, e uma branch policy restrita a `main` é hardening opcional.
+
 Nos diagramas, cada caixa grande representa um **job**, com seu objetivo e os
 **steps em ordem**, acompanhados de uma explicação breve. As setas azuis
 representam dependências `needs` entre jobs. No CI, `tf-validate` e
@@ -60,7 +65,7 @@ O `plan` é **opcional por decisão**: as credenciais do laboratório são efêm
 
 Executa `redocly lint` sobre `openapi/gateway.yaml`.
 
-Este job **é a mitigação declarada** de uma decisão: com o contrato entrando pelo `body` da API, um erro no documento só apareceria em tempo de `apply`. O comportamento foi confirmado por experimento — sem `fail_on_warnings`, uma integração com URI inválida produz uma **rota criada sem target** e um `apply` verde.
+Este job **é a mitigação declarada** de uma decisão: com o contrato entrando pelo `body` da API, alguns erros de integração só aparecem em tempo de `apply`. O [ADR 0002](adr/0002-contrato-do-gateway-em-openapi.md) registra o experimento que motivou `fail_on_warnings`: impedir uma rota sem target quando o import emite warning.
 
 ```bash
 npx --yes @redocly/cli@1.34.2 lint openapi/gateway.yaml \
@@ -91,7 +96,7 @@ Autentica com um **GitHub App token**, no mesmo padrão de `infra-base` e `k8s`.
 | # | Step no workflow | O que faz |
 | --- | --- | --- |
 | 1 | actions/checkout | Obtém a revisão que disparou o workflow; os comandos seguintes usam esse checkout. |
-| 2 | Generate GitHub App Token | Gera `app_token` com `BOT_APP_ID` e `BOT_PRIVATE_KEY`; o próximo step recebe o token como `GH_TOKEN`. |
+| 2 | Generate GitHub App Token | Gera `app_token` com a variable `BOT_APP_ID` e o secret `BOT_PRIVATE_KEY`; o próximo step recebe o token como `GH_TOKEN`. |
 | 3 | Open a PR to main if none exists | Consulta `gh pr list` para head → main e cria o PR só se não houver um aberto; erro do CLI reprova o job. |
 
 ## Workflow de CD

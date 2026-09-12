@@ -16,9 +16,9 @@
 
 Este repositório contém o código de **Infraestrutura como Código (IaC)** que publica a superfície pública da solução **Oficina Mecânica**: um **AWS API Gateway HTTP API (v2)** que encaminha cada requisição para o backend correspondente.
 
-Faz parte do ecossistema de microsserviços e infraestrutura da pós-graduação em Arquitetura de Software da FIAP (turma 15SOAT).
+Faz parte do ecossistema de aplicação e infraestrutura da pós-graduação em Arquitetura de Software da FIAP (turma 15SOAT).
 
-Antes dele a solução **não tinha entrada**: a API no EKS era um `Service` do tipo `ClusterIP`, sem Ingress e sem load balancer — o único acesso externo era `kubectl port-forward` —, e a função serverless de autenticação de clientes estava implementada e testada, porém não provisionada.
+A entrada pública encaminha o login de clientes à Lambda e as rotas `/api/*` à API no EKS. O cluster recebe esse tráfego pelo NLB interno e pelo `Service` NodePort; a função executa nas subnets privadas e consulta diretamente o RDS. A identidade de cliente e as operações internas continuam sob responsabilidade dos respectivos backends.
 
 ### Responsabilidade deste repositório
 
@@ -94,7 +94,7 @@ Nada no caminho até o cluster tem endereço público: o balanceador é **intern
 
 A leitura é direta, sem tratamento que a torne opcional: se um dos contratos não existir, o `plan` falha nomeando o que falta, **antes** de criar qualquer recurso.
 
-## 📁 Estrutura do Projeto
+## 📁 Estrutura do Repositório
 
 ```text
 .
@@ -133,7 +133,7 @@ A leitura é direta, sem tratamento que a torne opcional: se um dos contratos n�
 └── README.md
 ```
 
-## 💻 Execução e validação local
+## 💻 Como Executar Localmente
 
 ```bash
 # 1. Clonar e entrar na pasta do Terraform
@@ -162,7 +162,7 @@ terraform plan
 
 > O `--extends=minimal` mantém a validação **estrutural** da especificação ligada; as três regras puladas são opinativas de estilo, e o motivo de cada uma está no próprio step do CI.
 
-## 🌍 Terraform
+## 🌍 Estado Remoto (Remote State)
 
 Estado remoto no S3, no mesmo padrão dos demais repositórios de infraestrutura:
 
@@ -176,8 +176,8 @@ Detalhamento de recursos, variáveis e outputs em [docs/terraform.md](docs/terra
 
 ## 🔄 CI/CD e deploy
 
-- **CI** ([`ci.yml`](.github/workflows/ci.yml)) — dispara em `push` nas branches `feature/**` e `fix/**`. Executa `terraform fmt -check`, `init -backend=false`, `validate`, o **lint do contrato OpenAPI** e um `plan` opcional (pulado, sem reprovar, quando o ambiente está indisponível). Ao final, abre o Pull Request para `main` de forma idempotente.
-- **CD** ([`cd.yml`](.github/workflows/cd.yml)) — dispara em `push` na `main` ou por **Run workflow**. Executa `init`, `validate`, `plan` e `apply -auto-approve` sob o environment `production`, com `concurrency: production` sem cancelamento. Controlado pela variable `ENABLE_DEPLOY`, que o disparo manual ignora.
+- **CI** ([`ci.yml`](.github/workflows/ci.yml)) — dispara em `push` nas branches `feature/**` e `fix/**`. Executa `terraform fmt -check`, `init -backend=false`, `validate`, o **lint do contrato OpenAPI** e um `plan` opcional (pulado quando a configuração das credenciais falha; erro de um `init` ou `plan` executado reprova). Ao final, abre o Pull Request para `main` de forma idempotente.
+- **CD** ([`cd.yml`](.github/workflows/cd.yml)) — dispara em `push` na `main` ou por **Run workflow**. Executa `init`, `validate`, `plan` e `apply -auto-approve` sob o environment `production`, com `concurrency: production` sem cancelamento. Controlado pela variable `ENABLE_DEPLOY`, que o disparo manual ignora somente quando a branch selecionada é `main`.
 
 A tabela completa de secrets, variables, environments e proteções está em [docs/ci-cd.md](docs/ci-cd.md) — nenhum item de configuração externa fica implícito.
 Esse documento também exibe os diagramas de CI e CD, com o objetivo de cada
@@ -192,7 +192,8 @@ job, as descrições dos steps e as dependências `needs`.
 
 | É consumido por | Para quê |
 |---|---|
-| [`oficina-mecanica-lambda-customer-auth`](https://github.com/FIAP-15SOAT/oficina-mecanica-lambda-customer-auth) | `api_execution_arn`, para montar o `aws_lambda_permission` escopado à rota |
+| [`oficina-mecanica-lambda-customer-auth`](https://github.com/FIAP-15SOAT/oficina-mecanica-lambda-customer-auth) | `api_execution_arn`, para montar o `aws_lambda_permission` escopado à rota, e `api_endpoint`, para o gate público do CD |
+| [`oficina-mecanica-custom-monitoring`](https://github.com/FIAP-15SOAT/oficina-mecanica-custom-monitoring) | `api_endpoint`, para o Synthetic HTTP de prontidão |
 
 ## 📚 Documentação
 

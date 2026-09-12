@@ -80,39 +80,39 @@ Os valores são lidos **sem tratamento que os torne opcionais**: se um contrato 
 
 Nenhuma exige valor externo além das credenciais — todas têm default.
 
-| Variável | Tipo | Padrão | Descrição |
-|---|---|---|---|
-| `aws_region` | `string` | `us-east-1` | Região da AWS |
-| `project_name` | `string` | `oficina-mecanica` | Base dos nomes de recurso e das tags |
-| `environment` | `string` | `prod-simulated` | Ambiente, usado em `default_tags` |
-| `aws_base_state_bucket` | `string` | `bkt-oficina-mecanica` | Bucket do state de `infra-base` |
-| `aws_base_state_key` | `string` | `infra/prod-simulated/infra-base/terraform.tfstate` | Chave do state de `infra-base` |
-| `aws_base_state_region` | `string` | `us-east-1` | Região do bucket de `infra-base` |
-| `k8s_state_bucket` | `string` | `bkt-oficina-mecanica` | Bucket do state de `k8s` |
-| `k8s_state_key` | `string` | `infra/prod-simulated/k8s/terraform.tfstate` | Chave do state de `k8s` |
-| `k8s_state_region` | `string` | `us-east-1` | Região do bucket de `k8s` |
-| `nlb_listener_port` | `number` | `80` | Porta do listener do NLB interno; único destino do egress do SG do VPC Link. Precisa casar com o `aws_lb_listener` em `oficina-mecanica-infra-k8s` |
-| `customer_auth_function_name` | `string` | `lbd-oficina-mecanica-customer-auth` | Nome da função serverless; compõe o URI de invocação |
-| `stage_throttling_rate_limit` | `number` | `50` | Requisições por segundo do throttling padrão do stage |
-| `stage_throttling_burst_limit` | `number` | `100` | Rajada do throttling padrão |
-| `login_throttling_rate_limit` | `number` | `5` | Requisições por segundo das duas rotas de login |
-| `login_throttling_burst_limit` | `number` | `10` | Rajada das rotas de login |
-| `access_log_retention_in_days` | `number` | `14` | Retenção do log de acesso |
+| Variável | Tipo | Padrão | Descrição | Uso |
+|---|---|---|---|---|
+| `aws_region` | `string` | `us-east-1` | Região da AWS | Configura o provider que cria a API e compõe o ARN de invocação Lambda. |
+| `project_name` | `string` | `oficina-mecanica` | Base dos nomes de recurso e das tags | Compõe os nomes da API, VPC Link, SG e log group. |
+| `environment` | `string` | `prod-simulated` | Ambiente, usado em `default_tags` | Aplica a tag Environment; o stage continua `$default`. |
+| `aws_base_state_bucket` | `string` | `bkt-oficina-mecanica` | Bucket do state de `infra-base` | Localiza o bucket da rede consumida pelo VPC Link e SG. |
+| `aws_base_state_key` | `string` | `infra/prod-simulated/infra-base/terraform.tfstate` | Chave do state de `infra-base` | Seleciona o objeto que publica VPC, CIDR e subnets privadas. |
+| `aws_base_state_region` | `string` | `us-east-1` | Região do bucket de `infra-base` | Define a região usada na leitura do state de rede. |
+| `k8s_state_bucket` | `string` | `bkt-oficina-mecanica` | Bucket do state de `k8s` | Localiza o bucket da plataforma que fornece o listener privado. |
+| `k8s_state_key` | `string` | `infra/prod-simulated/k8s/terraform.tfstate` | Chave do state de `k8s` | Seleciona o objeto que publica `api_nlb_listener_arn`. |
+| `k8s_state_region` | `string` | `us-east-1` | Região do bucket de `k8s` | Define a região da leitura do state Kubernetes. |
+| `nlb_listener_port` | `number` | `80` | Porta do listener do NLB interno; único destino do egress do SG do VPC Link. Precisa casar com o `aws_lb_listener` em `oficina-mecanica-infra-k8s` | Restringe o egress do SG; não altera a porta do listener criado na stack Kubernetes. |
+| `customer_auth_function_name` | `string` | `lbd-oficina-mecanica-customer-auth` | Nome da função serverless; compõe o URI de invocação | Monta o URI Lambda sem ler seu state; deve coincidir com `function_name` da Lambda. |
+| `stage_throttling_rate_limit` | `number` | `50` | Requisições por segundo do throttling padrão do stage | Aplica o alvo padrão de req/s às rotas sem override. |
+| `stage_throttling_burst_limit` | `number` | `100` | Rajada do throttling padrão | Define a capacidade de rajada padrão do stage. |
+| `login_throttling_rate_limit` | `number` | `5` | Requisições por segundo das duas rotas de login | Sobrescreve o alvo de req/s nas duas rotas de login. |
+| `login_throttling_burst_limit` | `number` | `10` | Rajada das rotas de login | Sobrescreve a capacidade de rajada das duas rotas de login. |
+| `access_log_retention_in_days` | `number` | `14` | Retenção do log de acesso | Controla a exclusão automática dos access logs no CloudWatch. |
 
 > Os limites de frequência são **alvos agregados por rota**, aplicados com melhor esforço — não cotas por cliente. Ver [security.md](security.md).
 
 ## Saídas exportadas
 
-| Saída | Descrição |
-|---|---|
-| `api_endpoint` | Endereço público do Gateway (stage `$default`). Base de qualquer verificação externa |
-| `api_id` | Identificador da HTTP API. Usado em `aws apigatewayv2 get-integrations --api-id <id>` para conferir os parameter mappings no recurso provisionado |
-| `api_execution_arn` | ARN de execução, **consumido pelo repositório da função serverless** — ver abaixo |
-| `vpc_link_id` | Identificador do VPC Link V2. Útil para diagnosticar o estado `INACTIVE` após 60 dias sem tráfego |
+| Saída | Descrição | Uso |
+|---|---|---|
+| `api_endpoint` | Endereço público do Gateway (stage `$default`). Base de qualquer verificação externa | Lambda e monitoring leem via remote state; o CD da Lambda usa no gate público, e o monitoring no Synthetic. |
+| `api_id` | Identificador da HTTP API. Usado em `aws apigatewayv2 get-integrations --api-id <id>` para conferir os parameter mappings no recurso provisionado | Inspeção manual de rotas/integrações pela AWS CLI; não é lido por outra stack. |
+| `api_execution_arn` | ARN de execução, **consumido pelo repositório da função serverless** — ver abaixo | A Lambda lê automaticamente para construir `source_arn` da permissão de invocação. |
+| `vpc_link_id` | Identificador do VPC Link V2. Útil para diagnosticar o estado `INACTIVE` após 60 dias sem tráfego | Inspeção manual de estado e configuração do VPC Link; não é lido por outra stack. |
 
 ## O contrato consumido pelo repositório da função serverless
 
-O `aws_lambda_permission` **não** é criado aqui: ele fica no repositório dono da função. Só a permissão exige que a função exista (`lambda:AddPermission` devolve `ResourceNotFoundException`), e movê-la para lá permite que este API Gateway seja provisionada **uma vez, completa**, sem revisita.
+O `aws_lambda_permission` **não** é criado aqui: ele fica no repositório dono da função. Só a permissão exige que a função exista (`lambda:AddPermission` devolve `ResourceNotFoundException`), e movê-la para lá permite que este API Gateway seja provisionado **uma vez, completa**, sem revisita.
 
 Delegar sem entregar o contrato seria delegar pela metade. A forma exata, para não precisar ser inferida:
 
@@ -163,9 +163,12 @@ export AWS_SECRET_ACCESS_KEY="..."
 export AWS_SESSION_TOKEN="..."     # o AWS Academy sempre exige os três
 export AWS_DEFAULT_REGION="us-east-1"
 
+# Entrar na stack a partir da raiz do clone
 cd terraform
+# Configurar o backend e revisar as alterações
 terraform init
 terraform plan
+# Provisionar após revisar o plano
 terraform apply
 
 # Conferir o resultado
@@ -174,7 +177,8 @@ aws apigatewayv2 get-integrations --api-id "$(terraform output -raw api_id)" \
   --query 'Items[].[IntegrationType,PayloadFormatVersion,RequestParameters]'
 ```
 
-Para derrubar o ambiente ao fim dos testes:
+Para derrubar o ambiente ao fim dos testes, remova primeiro monitoring e Lambda,
+que leem o state do gateway. Depois remova gateway antes do NLB/Kubernetes:
 
 ```bash
 terraform destroy
