@@ -111,20 +111,26 @@ A leitura é direta, sem tratamento que a torne opcional: se um dos contratos n�
 │   ├── observability.md         # log de acesso, correlação e métricas
 │   ├── adr/                     # decisões arquiteturais
 │   └── diagrams/                # diagramas em PNG, com o XML do draw.io embutido
+│       ├── infrastructure.png   # arquitetura e caminho das requisições
+│       ├── ci-workflow.png      # jobs, steps descritos e dependências do CI
+│       └── cd-workflow.png      # job, steps descritos e gate do CD
 ├── openapi/
 │   └── gateway.yaml             # a superfície de roteamento pública
-└── terraform/
-    ├── backend.tf               # backend S3 com lock nativo
-    ├── providers.tf             # provider AWS e os dois remote states
-    ├── data.tf                  # conta e região
-    ├── locals.tf                # nomes derivados de project_name
-    ├── security_groups.tf       # security group do VPC Link (só egress)
-    ├── api_gateway.tf           # VPC Link, API (body) e stage
-    ├── cloudwatch.tf            # log group do log de acesso
-    ├── variables.tf
-    ├── outputs.tf
-    ├── terraform.tfvars
-    └── terraform.tfvars.example
+├── terraform/
+│   ├── .terraform.lock.hcl       # versões e checksums dos providers
+│   ├── backend.tf               # backend S3 com lock nativo
+│   ├── providers.tf             # provider AWS e os dois remote states
+│   ├── data.tf                  # conta e região
+│   ├── locals.tf                # nomes derivados de project_name
+│   ├── security_groups.tf       # security group do VPC Link (só egress)
+│   ├── api_gateway.tf           # VPC Link, API (body) e stage
+│   ├── cloudwatch.tf            # log group do log de acesso
+│   ├── variables.tf
+│   ├── outputs.tf
+│   ├── terraform.tfvars
+│   └── terraform.tfvars.example
+├── .gitignore
+└── README.md
 ```
 
 ## 💻 Execução e validação local
@@ -174,6 +180,8 @@ Detalhamento de recursos, variáveis e outputs em [docs/terraform.md](docs/terra
 - **CD** ([`cd.yml`](.github/workflows/cd.yml)) — dispara em `push` na `main` ou por **Run workflow**. Executa `init`, `validate`, `plan` e `apply -auto-approve` sob o environment `production`, com `concurrency: production` sem cancelamento. Controlado pela variable `ENABLE_DEPLOY`, que o disparo manual ignora.
 
 A tabela completa de secrets, variables, environments e proteções está em [docs/ci-cd.md](docs/ci-cd.md) — nenhum item de configuração externa fica implícito.
+Esse documento também exibe os diagramas de CI e CD, com o objetivo de cada
+job, as descrições dos steps e as dependências `needs`.
 
 ## 🔗 Dependências externas
 

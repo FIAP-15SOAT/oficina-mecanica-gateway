@@ -18,7 +18,19 @@ Os dois workflows job a job, os gates que os protegem, a tabela completa de conf
 | [`ci.yml`](../.github/workflows/ci.yml) | `push` em `feature/**` e `fix/**` | `ci-<ref>`, **cancela** execuções obsoletas | Valida Terraform e o contrato OpenAPI, tenta um `plan`, abre o PR |
 | [`cd.yml`](../.github/workflows/cd.yml) | `push` na `main` ou **Run workflow** | `production`, **não cancela** — enfileira | Provisiona sob o environment `production` |
 
-<p align="center"><img src="diagrams/ci-cd-workflow.png" alt="Diagrama dos workflows: no CI, um push em feature ou fix dispara em paralelo os jobs tf-validate (fmt, init sem backend, validate, credenciais com continue-on-error, plan opcional e nota no resumo) e openapi-lint (redocly lint com extends minimal, validacao estrutural ligada e tres regras de estilo puladas); ambos sao needs do job open-pr, que gera o GitHub App token e abre o PR para main de forma idempotente. O merge do PR leva ao CD, onde um push na main ou workflow_dispatch passa pelo gate ENABLE_DEPLOY: se negativo o run fica skipped e nada e provisionado; se positivo executa o job terraform-gateway sob o environment production, com configure credentials, init, validate, plan e apply auto-approve. A verificacao externa e manual, fora do pipeline" width="100%"></p>
+Nos diagramas, cada caixa grande representa um **job**, com seu objetivo e os
+**steps em ordem**, acompanhados de uma explicação breve. As setas azuis
+representam dependências `needs` entre jobs. No CI, `tf-validate` e
+`openapi-lint` executam em paralelo; `open-pr` depende do sucesso de ambos.
+O CD tem um único job, `terraform-gateway`, sem `needs` com o workflow de CI.
+
+**CI — validações e abertura do PR**
+
+![CI do gateway: objetivos dos três jobs e descrição dos 13 steps; tf-validate e openapi-lint são dependências needs de open-pr](diagrams/ci-workflow.png)
+
+**CD — provisionamento do gateway**
+
+![CD do gateway: objetivo do job terraform-gateway e descrição dos sete steps, com gate de main e ENABLE_DEPLOY ou disparo manual](diagrams/cd-workflow.png)
 
 ## Workflow de CI
 
@@ -26,18 +38,25 @@ Todo `push` em branch de trabalho valida o repositório **inteiro** — não há
 
 ### Job `tf-validate`
 
-| Passo | O que faz | Reprova quando |
-|---|---|---|
-| `terraform fmt -check -recursive` | Formatação canônica | Um arquivo não está formatado |
-| `terraform init -backend=false` | Inicializa **sem** credenciais | — |
-| `terraform validate` | Sintaxe e referências | Configuração inválida |
-| Configure AWS Credentials | `continue-on-error: true` | **nunca** |
-| `terraform plan` | Prévia, só se as credenciais funcionaram | Erro real de `plan` |
-| Nota no resumo | Registra que o `plan` foi pulado | — |
+| # | Step no workflow | O que faz |
+| --- | --- | --- |
+| 1 | actions/checkout | Obtém a revisão que disparou o workflow; os comandos seguintes usam esse checkout. |
+| 2 | Setup Terraform | Instala/configura a CLI Terraform para os comandos seguintes. |
+| 3 | Terraform Fmt Check | Executa `terraform fmt -check -recursive`; divergência de formatação reprova o job. |
+| 4 | Terraform Init Gateway | Executa `terraform init -backend=false -no-color`: instala os providers sem conectar ao backend. Registry/cache indisponível pode reprovar. |
+| 5 | Terraform Validate Gateway | Executa `terraform validate -no-color` com os schemas instalados; inconsistência de sintaxe, tipo ou referência reprova. |
+| 6 | Configure AWS Credentials | Configura access key, secret key e session token da mesma sessão AWS, em us-east-1. Este step tolera falha e conserva `aws_creds.outcome` para decidir entre plan e nota de skip. |
+| 7 | Terraform Plan Gateway | Só com `aws_creds.outcome == success`: executa init com backend (`-reconfigure`) e plan. Qualquer erro desses comandos reprova o job. |
+| 8 | Note skipped plan in job summary | Só com `aws_creds.outcome == failure`: registra no resumo que a prévia foi pulada; não ignora erro de um plan executado. |
 
 O `plan` é **opcional por decisão**: as credenciais do laboratório são efêmeras e o ambiente fica desligado a maior parte do tempo. Sem elas, o job segue verde e registra no `$GITHUB_STEP_SUMMARY` que a prévia foi pulada — `fmt` e `validate` já garantiram o que precisava ser garantido, e nenhum dos dois exige nuvem.
 
 ### Job `openapi-lint`
+
+| # | Step no workflow | O que faz |
+| --- | --- | --- |
+| 1 | actions/checkout | Obtém a revisão que disparou o workflow; os comandos seguintes usam esse checkout. |
+| 2 | Lint the OpenAPI contract | Executa o lint estrutural do contrato `openapi/gateway.yaml` com Redocly, na configuração explicada abaixo; falha do lint reprova. |
 
 Executa `redocly lint` sobre `openapi/gateway.yaml`.
 
@@ -69,26 +88,35 @@ Depende de `tf-validate` **e** `openapi-lint`. Abre o Pull Request para `main` d
 
 Autentica com um **GitHub App token**, no mesmo padrão de `infra-base` e `k8s`.
 
+| # | Step no workflow | O que faz |
+| --- | --- | --- |
+| 1 | actions/checkout | Obtém a revisão que disparou o workflow; os comandos seguintes usam esse checkout. |
+| 2 | Generate GitHub App Token | Gera `app_token` com `BOT_APP_ID` e `BOT_PRIVATE_KEY`; o próximo step recebe o token como `GH_TOKEN`. |
+| 3 | Open a PR to main if none exists | Consulta `gh pr list` para head → main e cria o PR só se não houver um aberto; erro do CLI reprova o job. |
+
 ## Workflow de CD
 
 Um único job, `terraform-gateway`, sob o environment `production`.
 
-| Passo | Comando |
-|---|---|
-| Init | `terraform init -no-color` |
-| Validate | `terraform validate -no-color` |
-| Plan | `terraform plan -no-color` |
-| Apply | `terraform apply -auto-approve -no-color` |
+| # | Step no workflow | O que faz |
+| --- | --- | --- |
+| 1 | actions/checkout | Obtém a revisão que disparou o workflow; os comandos seguintes usam esse checkout. |
+| 2 | Setup Terraform | Instala/configura a CLI Terraform para os comandos seguintes. |
+| 3 | Configure AWS Credentials | Configura access key, secret key e session token da mesma sessão AWS, em us-east-1. |
+| 4 | Terraform Init | Executa `terraform init -no-color`, instalando providers e configurando o backend S3 real. |
+| 5 | Terraform Validate | Executa `terraform validate -no-color`; inconsistência de configuração reprova o job. |
+| 6 | Terraform Plan | Executa `terraform plan -no-color`; consulta providers e states necessários e mostra as alterações. |
+| 7 | Terraform Apply | Executa `terraform apply -auto-approve -no-color`; calcula seu próprio plano, pois não há plano salvo no step anterior. |
 
 **Três proteções:**
 
-1. **`concurrency: production` com `cancel-in-progress: false`.** Um provisionamento nunca é interrompido no meio; execuções simultâneas ficam na fila. É o state do Terraform que está sendo protegido.
+1. **`concurrency: production` com `cancel-in-progress: false`.** Um provisionamento nunca é interrompido no meio; o grupo tem escopo neste repositório. Sem fila adicional, apenas um run fica pendente e um novo pode substituí-lo. É o state do Terraform que está sendo protegido.
 2. **Environment `production`.** Os segredos daquele escopo, e qualquer regra de proteção configurada nele, valem para o provisionamento.
 3. **Gate `ENABLE_DEPLOY`.** O ambiente pode ser mantido desligado sem que merges na `main` tentem provisionar:
    ```yaml
-   if: vars.ENABLE_DEPLOY == 'true' || github.event_name == 'workflow_dispatch'
+   if: github.ref == 'refs/heads/main' && (vars.ENABLE_DEPLOY == 'true' || github.event_name == 'workflow_dispatch')
    ```
-   O disparo manual **ignora o gate de propósito** — é o caminho para ligar o ambiente sob demanda.
+   O disparo manual **ignora o gate de propósito** — é o caminho para ligar o ambiente sob demanda, selecionando `main`; outra branch pula o job.
 
 > Se um merge na `main` aparecer como `skipped`, é o gate: `ENABLE_DEPLOY` não está em `true`. Não é falha.
 
