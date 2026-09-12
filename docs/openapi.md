@@ -50,7 +50,7 @@ O documento **não** declara `requestBody`, `components.schemas`, códigos de er
 
 | Backend | Contrato de payload |
 |---|---|
-| API no EKS | [`docs/api.md`](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/api.md) e o `/api/docs-json` publicado pela própria aplicação |
+| API no EKS | [`docs/api.md`](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/api.md) e o `/api/docs-json` publicado pela própria aplicação |
 | Função serverless | [`docs/contracts.md`](https://github.com/FIAP-15SOAT/oficina-mecanica-lambda-customer-auth/blob/main/docs/contracts.md) |
 
 **"Sem schemas" não significa "sem estrutura".** O documento continua sendo um OpenAPI 3.0 **válido**: cada operação declara um `responses` mínimo (`default` com `description`) e `/api/{proxy+}` declara o `parameters` do `proxy` com `required: true`. Nenhum dos dois é contrato de payload — e sem eles o documento é inválido segundo a especificação, o que reprova o lint e pode virar warning no import, que `fail_on_warnings = true` transforma em falha de `apply`.
@@ -118,7 +118,7 @@ Declaradas uma única vez em `components.x-amazon-apigateway-integrations` e ref
 | `type` | `http_proxy` | `aws_proxy` |
 | `httpMethod` | `ANY` | `POST` |
 | `payloadFormatVersion` | `"1.0"` | `"2.0"` |
-| `connectionType` | `VPC_LINK` | — (INTERNET) |
+| `connectionType` | `VPC_LINK` | — (invocação de serviço, sem VPC Link) |
 | `uri` | ARN do listener do NLB | URI de invocação da função |
 | `requestParameters` | `overwrite:path`, `overwrite:header.x-request-id` | `overwrite:header.x-request-id` |
 
@@ -130,8 +130,8 @@ Declaradas uma única vez em `components.x-amazon-apigateway-integrations` e ref
 
 **Sobre os parameter mappings, que não são opcionais:**
 
-- `overwrite:path = $request.path` — a integração privada **inclui a porção de stage** no caminho enviado ao backend, e a AWS prescreve esse mapeamento para removê-la. Verificado: a aplicação recebe `/api/customers`, não `/$default/api/customers`.
-- `overwrite:header.x-request-id = $context.requestId` — em **ambas**. Sem ele na integração da Lambda, a função cairia no `awsRequestId` da plataforma e a correlação quebraria justamente na rota que este API Gateway existe para publicar.
+- `overwrite:path = $request.path` — a integração privada **inclui a porção de stage** no caminho enviado ao backend, e a AWS prescreve esse mapeamento para removê-la. O backend deve receber `/api/customers`, não `/$default/api/customers`, sem prefixo de stage.
+- `overwrite:header.x-request-id = $context.requestId` — em **ambas**. A API aceita os caracteres de base64 usados pelo Gateway. A Lambda reutiliza somente IDs aceitos pelo seu validador; com `=`, `+` ou `/` ela usa o ID da invocação. O mapeamento no OpenAPI não garante, sozinho, a junção dos logs da Lambda — ver [Observabilidade](observability.md#correlação-fim-a-fim).
 
 ## Como o documento é validado
 

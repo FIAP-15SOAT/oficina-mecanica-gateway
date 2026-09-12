@@ -16,9 +16,9 @@
 
 Este repositório contém o código de **Infraestrutura como Código (IaC)** que publica a superfície pública da solução **Oficina Mecânica**: um **AWS API Gateway HTTP API (v2)** que encaminha cada requisição para o backend correspondente.
 
-Faz parte do ecossistema de microsserviços e infraestrutura da pós-graduação em Arquitetura de Software da FIAP (turma 15SOAT).
+Faz parte do ecossistema de aplicação e infraestrutura da pós-graduação em Arquitetura de Software da FIAP (turma 15SOAT).
 
-Antes dele a solução **não tinha entrada**: a API no EKS era um `Service` do tipo `ClusterIP`, sem Ingress e sem load balancer — o único acesso externo era `kubectl port-forward` —, e a função serverless de autenticação de clientes estava implementada e testada, porém não provisionada.
+A entrada pública encaminha o login de clientes à Lambda e as rotas `/api/*` à API no EKS. O cluster recebe esse tráfego pelo NLB interno e pelo `Service` NodePort; a função executa nas subnets privadas e consulta diretamente o RDS. A identidade de cliente e as operações internas continuam sob responsabilidade dos respectivos backends.
 
 ### Responsabilidade deste repositório
 
@@ -32,7 +32,7 @@ O que ele **deliberadamente não faz**:
 
 - **Não autentica e não autoriza.** Encaminha o cabeçalho de autorização intacto; `401` e `403` continuam sendo produzidos pelos backends. Não é adiamento — é impossibilidade técnica somada a uma propriedade de segurança que seria destruída. Ver [ADR 0004](docs/adr/0004-autenticacao-permanece-nos-backends.md).
 - **Não valida payload.** Os contratos de request e response pertencem à API e à função serverless, e são referenciados por link — nunca copiados.
-- **Não é dono do balanceador interno.** Ele vive em [`oficina-mecanica-k8s`](https://github.com/FIAP-15SOAT/oficina-mecanica-k8s), pelos motivos do [ADR 0003](docs/adr/0003-integracao-privada-com-o-eks.md).
+- **Não é dono do balanceador interno.** Ele vive em [`oficina-mecanica-infra-k8s`](https://github.com/FIAP-15SOAT/oficina-mecanica-infra-k8s), pelos motivos do [ADR 0003](docs/adr/0003-integracao-privada-com-o-eks.md).
 
 ## 🏗️ Arquitetura em alto nível
 
@@ -51,7 +51,7 @@ O que ele **deliberadamente não faz**:
                         └────────┬─────────┘   └──────────────────────────┘
                                  ▼
                         ┌──────────────────┐
-                        │  NLB interno :80 │   ← provisionado em oficina-mecanica-k8s
+                        │  NLB interno :80 │   ← provisionado em oficina-mecanica-infra-k8s
                         └────────┬─────────┘
                                  ▼
                         NodePort 30080 do nó ──▶ Pod da API (EKS)
@@ -90,11 +90,11 @@ Nada no caminho até o cluster tem endereço público: o balanceador é **intern
 | Repositório | O que este consome | Como |
 |---|---|---|
 | [`oficina-mecanica-infra-base`](https://github.com/FIAP-15SOAT/oficina-mecanica-infra-base) | `vpc_id`, `vpc_cidr`, `private_subnet_ids` | `terraform_remote_state` |
-| [`oficina-mecanica-k8s`](https://github.com/FIAP-15SOAT/oficina-mecanica-k8s) | `api_nlb_listener_arn` | `terraform_remote_state` |
+| [`oficina-mecanica-infra-k8s`](https://github.com/FIAP-15SOAT/oficina-mecanica-infra-k8s) | `api_nlb_listener_arn` | `terraform_remote_state` |
 
 A leitura é direta, sem tratamento que a torne opcional: se um dos contratos não existir, o `plan` falha nomeando o que falta, **antes** de criar qualquer recurso.
 
-## 📁 Estrutura do Projeto
+## 📁 Estrutura do Repositório
 
 ```text
 .
@@ -111,28 +111,34 @@ A leitura é direta, sem tratamento que a torne opcional: se um dos contratos n�
 │   ├── observability.md         # log de acesso, correlação e métricas
 │   ├── adr/                     # decisões arquiteturais
 │   └── diagrams/                # diagramas em PNG, com o XML do draw.io embutido
+│       ├── infrastructure.png   # arquitetura e caminho das requisições
+│       ├── ci-workflow.png      # jobs, steps descritos e dependências do CI
+│       └── cd-workflow.png      # job, steps descritos e gate do CD
 ├── openapi/
 │   └── gateway.yaml             # a superfície de roteamento pública
-└── terraform/
-    ├── backend.tf               # backend S3 com lock nativo
-    ├── providers.tf             # provider AWS e os dois remote states
-    ├── data.tf                  # conta e região
-    ├── locals.tf                # nomes derivados de project_name
-    ├── security_groups.tf       # security group do VPC Link (só egress)
-    ├── api_gateway.tf           # VPC Link, API (body) e stage
-    ├── cloudwatch.tf            # log group do log de acesso
-    ├── variables.tf
-    ├── outputs.tf
-    ├── terraform.tfvars
-    └── terraform.tfvars.example
+├── terraform/
+│   ├── .terraform.lock.hcl       # versões e checksums dos providers
+│   ├── backend.tf               # backend S3 com lock nativo
+│   ├── providers.tf             # provider AWS e os dois remote states
+│   ├── data.tf                  # conta e região
+│   ├── locals.tf                # nomes derivados de project_name
+│   ├── security_groups.tf       # security group do VPC Link (só egress)
+│   ├── api_gateway.tf           # VPC Link, API (body) e stage
+│   ├── cloudwatch.tf            # log group do log de acesso
+│   ├── variables.tf
+│   ├── outputs.tf
+│   ├── terraform.tfvars
+│   └── terraform.tfvars.example
+├── .gitignore
+└── README.md
 ```
 
-## 💻 Execução e validação local
+## 💻 Como Executar Localmente
 
 ```bash
 # 1. Clonar e entrar na pasta do Terraform
-git clone https://github.com/FIAP-15SOAT/oficina-mecanica-gateway.git
-cd oficina-mecanica-gateway
+git clone https://github.com/FIAP-15SOAT/oficina-mecanica-api-gateway.git
+cd oficina-mecanica-api-gateway
 
 # 2. Validar sem credenciais (formatação e validade da configuração)
 cd terraform
@@ -156,7 +162,7 @@ terraform plan
 
 > O `--extends=minimal` mantém a validação **estrutural** da especificação ligada; as três regras puladas são opinativas de estilo, e o motivo de cada uma está no próprio step do CI.
 
-## 🌍 Terraform
+## 🌍 Estado Remoto (Remote State)
 
 Estado remoto no S3, no mesmo padrão dos demais repositórios de infraestrutura:
 
@@ -170,21 +176,24 @@ Detalhamento de recursos, variáveis e outputs em [docs/terraform.md](docs/terra
 
 ## 🔄 CI/CD e deploy
 
-- **CI** ([`ci.yml`](.github/workflows/ci.yml)) — dispara em `push` nas branches `feature/**` e `fix/**`. Executa `terraform fmt -check`, `init -backend=false`, `validate`, o **lint do contrato OpenAPI** e um `plan` opcional (pulado, sem reprovar, quando o ambiente está indisponível). Ao final, abre o Pull Request para `main` de forma idempotente.
-- **CD** ([`cd.yml`](.github/workflows/cd.yml)) — dispara em `push` na `main` ou por **Run workflow**. Executa `init`, `validate`, `plan` e `apply -auto-approve` sob o environment `production`, com `concurrency: production` sem cancelamento. Controlado pela variable `ENABLE_DEPLOY`, que o disparo manual ignora.
+- **CI** ([`ci.yml`](.github/workflows/ci.yml)) — dispara em `push` nas branches `feature/**` e `fix/**`. Executa `terraform fmt -check`, `init -backend=false`, `validate`, o **lint do contrato OpenAPI** e um `plan` opcional (pulado quando a configuração das credenciais falha; erro de um `init` ou `plan` executado reprova). Ao final, abre o Pull Request para `main` de forma idempotente.
+- **CD** ([`cd.yml`](.github/workflows/cd.yml)) — dispara em `push` na `main` ou por **Run workflow**. Executa `init`, `validate`, `plan` e `apply -auto-approve` sob o environment `production`, com `concurrency: production` sem cancelamento. Controlado pela variable `ENABLE_DEPLOY`, que o disparo manual ignora somente quando a branch selecionada é `main`.
 
 A tabela completa de secrets, variables, environments e proteções está em [docs/ci-cd.md](docs/ci-cd.md) — nenhum item de configuração externa fica implícito.
+Esse documento também exibe os diagramas de CI e CD, com o objetivo de cada
+job, as descrições dos steps e as dependências `needs`.
 
 ## 🔗 Dependências externas
 
 | Depende de | Para quê |
 |---|---|
 | [`oficina-mecanica-infra-base`](https://github.com/FIAP-15SOAT/oficina-mecanica-infra-base) | VPC, CIDR e subnets privadas |
-| [`oficina-mecanica-k8s`](https://github.com/FIAP-15SOAT/oficina-mecanica-k8s) | ARN do listener do NLB interno |
+| [`oficina-mecanica-infra-k8s`](https://github.com/FIAP-15SOAT/oficina-mecanica-infra-k8s) | ARN do listener do NLB interno |
 
 | É consumido por | Para quê |
 |---|---|
-| [`oficina-mecanica-lambda-customer-auth`](https://github.com/FIAP-15SOAT/oficina-mecanica-lambda-customer-auth) | `api_execution_arn`, para montar o `aws_lambda_permission` escopado à rota |
+| [`oficina-mecanica-lambda-customer-auth`](https://github.com/FIAP-15SOAT/oficina-mecanica-lambda-customer-auth) | `api_execution_arn`, para montar o `aws_lambda_permission` escopado à rota, e `api_endpoint`, para o gate público do CD |
+| [`oficina-mecanica-custom-monitoring`](https://github.com/FIAP-15SOAT/oficina-mecanica-custom-monitoring) | `api_endpoint`, para o Synthetic HTTP de prontidão |
 
 ## 📚 Documentação
 
@@ -202,11 +211,11 @@ A tabela completa de secrets, variables, environments e proteções está em [do
 
 | Repositório | Papel |
 |---|---|
-| [oficina-mecanica-app](https://github.com/FIAP-15SOAT/oficina-mecanica-app) | Aplicação NestJS, domínio e manifests Kubernetes |
+| [oficina-mecanica-api](https://github.com/FIAP-15SOAT/oficina-mecanica-api) | Aplicação NestJS, domínio e manifests Kubernetes |
 | [oficina-mecanica-infra-base](https://github.com/FIAP-15SOAT/oficina-mecanica-infra-base) | Fundação de rede na AWS (VPC, subnets, gateways) |
-| [oficina-mecanica-k8s](https://github.com/FIAP-15SOAT/oficina-mecanica-k8s) | Cluster EKS, node group, ECR e o **caminho privado de entrada** |
-| [oficina-mecanica-database](https://github.com/FIAP-15SOAT/oficina-mecanica-database) | Amazon RDS PostgreSQL, fora do cluster |
-| **oficina-mecanica-gateway** *(este repositório)* | **Ponto de entrada público** da solução |
+| [oficina-mecanica-infra-k8s](https://github.com/FIAP-15SOAT/oficina-mecanica-infra-k8s) | Cluster EKS, node group, ECR e o **caminho privado de entrada** |
+| [oficina-mecanica-infra-database](https://github.com/FIAP-15SOAT/oficina-mecanica-infra-database) | Amazon RDS PostgreSQL, fora do cluster |
+| **oficina-mecanica-api-gateway** *(este repositório)* | **Ponto de entrada público** da solução |
 | [oficina-mecanica-lambda-customer-auth](https://github.com/FIAP-15SOAT/oficina-mecanica-lambda-customer-auth) | Autenticação externa de clientes por CPF em função serverless |
 
 ## 👥 Autores

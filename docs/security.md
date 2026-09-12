@@ -28,7 +28,7 @@ O que **não** muda: o cluster continua sem exposição direta. O balanceador é
 | Método restrito por rota | `POST /customer-auth/login` publica apenas `POST`; outro método no mesmo caminho recebe `404` do API Gateway |
 | Limitação de frequência | `50/100` req/s padrão no stage; `5/10` nas duas rotas de login |
 | Permissão de invocação escopada | O `aws_lambda_permission` autoriza **apenas** a rota `POST /customer-auth/login` desta API — não "qualquer rota", não "qualquer API" |
-| Log sem dado sensível | Sem corpo, sem query string, sem URL crua e sem cabeçalho de autorização. Nenhuma credencial pode acabar ali, em nenhum status |
+| Log sem dado sensível | Sem corpo, sem query string, sem URL crua e sem cabeçalho de autorização. Corpos e cabeçalhos de credencial são excluídos do formato; `integrationError` é diagnóstico produzido pela AWS, não texto sanitizado pela aplicação |
 | Retenção finita | 14 dias, alinhada à retenção dos logs de plataforma do projeto |
 | Cabeçalho de autorização intacto | O API Gateway encaminha sem inspecionar, validar ou registrar |
 
@@ -79,7 +79,8 @@ Os corpos dos endpoints de saúde são constantes e não revelam estado interno.
 
 **Por que foi aceito.** Coerente com a postura atual do cluster, que também não tem TLS interno. O tráfego não sai da VPC.
 
-**Evolução.** Listener HTTPS com certificado no NLB.
+**Evolução.** Listener TLS com certificado no NLB e configuração TLS compatível
+da integração privada; o protocolo até os targets também precisaria ser revisto.
 
 ### 6. Credenciais AWS disponíveis ao CI de branch
 
@@ -104,7 +105,7 @@ Nada aqui é pendência: são caminhos conhecidos caso o contexto mude.
 | Domínio customizado com certificado | Existir um domínio para a solução |
 | WAF na frente do API Gateway | Requisito real de proteção contra tráfego adversário — exigiria REST API ou CloudFront |
 | Autorizador JWT no API Gateway | Publicar JWKS na função serverless e mudar `iss` para URL; o fluxo interno continuaria impossível enquanto for HS256 |
-| TLS até o backend | Listener HTTPS no NLB com certificado |
+| TLS até o backend | Listener TLS no NLB, TLS na integração e revisão do protocolo até os targets |
 | Swagger fechado em produção | O projeto deixar de ser demonstrativo |
 | Guard global na API | Pertence ao repositório da API — ver risco 4 |
 
@@ -114,4 +115,4 @@ Nada aqui é pendência: são caminhos conhecidos caso o contexto mude.
 - 📐 [ADR 0004](adr/0004-autenticacao-permanece-nos-backends.md) — por que não há autenticação no API Gateway.
 - 📊 [Observabilidade](observability.md) — o que o log registra e o que ele deliberadamente não registra.
 - 🔒 [`security.md` da função serverless](https://github.com/FIAP-15SOAT/oficina-mecanica-lambda-customer-auth/blob/main/docs/security.md) — onde o throttling é delegado a este API Gateway.
-- 🔒 [`security.md` da API](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/security.md) — mitigações no código e relatórios.
+- 🔒 [`security.md` da API](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/security.md) — mitigações no código e relatórios.

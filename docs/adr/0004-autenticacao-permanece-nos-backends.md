@@ -4,7 +4,7 @@
 
 Aceito — 2026-09-07
 
-Referencia e preserva o [ADR 0004 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/adr/0004-autenticacao-de-clientes.md), que desenhou a separação entre os dois fluxos de autenticação.
+Referencia e preserva o [Arquitetura de identidade externa da API](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/architecture.md#identidade-externa-autenticação-e-autorização-por-vínculo), que desenhou a separação entre os dois fluxos de autenticação.
 
 ## Contexto
 
@@ -17,7 +17,7 @@ Ela não ficou para depois. Há **dois fluxos de autenticação** nesta soluçã
 | Usuários internos (`/api/auth/login`) | a própria API | **HS256** (segredo simétrico) | — | não se aplica |
 | Clientes externos (`/customer-auth/login`) | função serverless de autenticação | RS256 | `oficina-customer-auth` — **não é URL** | **não** |
 
-E há um fato de desenho que importa mais que os dois: **a autorização do cliente não vem do token**. O ADR 0004 da API a resolve por vínculo no banco a cada requisição, justamente para que uma revogação valha imediatamente, sem esperar um token expirar.
+E há um fato de desenho que importa mais que os dois: **a autorização do cliente não vem do token**. A API a resolve por vínculo no banco a cada requisição, justamente para que uma revogação valha imediatamente, sem esperar um token expirar.
 
 ## Decisão
 
@@ -29,7 +29,7 @@ O Gateway **não autentica e não autoriza**. Ele encaminha o cabeçalho de auto
 
 **2. O token de cliente é RS256, mas não há como o authorizer obter a chave.** O JWT authorizer busca a chave pública no `jwks_uri` derivado do emissor. Aqui, `iss = oficina-customer-auth` não é sequer uma URL, e nenhum JWKS é publicado. Impossível hoje.
 
-**3. Ainda que fosse possível, destruiria uma propriedade de segurança existente.** O ADR 0004 da API desenhou **dois verificadores isolados** — um por fluxo — precisamente para eliminar por construção a confusão de algoritmo (*algorithm confusion*): um verificador que aceitasse tanto HS256 quanto RS256 permitiria forjar um token assinando com a chave pública tratada como segredo simétrico. Um autorizador único no API Gateway que aceitasse os dois **reintroduziria exatamente a classe de ataque que foi projetada para fora**.
+**3. Ainda que fosse possível, destruiria uma propriedade de segurança existente.** A API mantém **dois verificadores isolados** — um por fluxo — precisamente para eliminar por construção a confusão de algoritmo (*algorithm confusion*): um verificador que aceitasse tanto HS256 quanto RS256 permitiria forjar um token assinando com a chave pública tratada como segredo simétrico. Um autorizador único no API Gateway que aceitasse os dois **reintroduziria exatamente a classe de ataque que foi projetada para fora**.
 
 **4. A decisão real depende do banco, e o API Gateway não o alcança.** A autorização do cliente é o vínculo cliente↔recurso, resolvido por consulta a cada requisição. Um autorizador de API Gateway jamais poderia tomar essa decisão; no máximo validaria a assinatura — e a API validaria de novo, porque não pode confiar apenas nisso. Ganho: nenhum. Custo: mais um lugar guardando segredo.
 
@@ -68,6 +68,6 @@ Um requisito **explícito** de autenticação no API Gateway — por exemplo, um
 - [Controlar acesso a HTTP APIs com autorizadores JWT](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html)
 - [Autorizadores Lambda para HTTP APIs](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-lambda-authorizer.html)
 - [Throttling de HTTP APIs](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-throttling.html)
-- [ADR 0004 da API — Autenticação de clientes](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/adr/0004-autenticacao-de-clientes.md)
+- [ADR 0004 da API — Autenticação de clientes](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/architecture.md#identidade-externa-autenticação-e-autorização-por-vínculo)
 - [`docs/security.md` da função serverless](https://github.com/FIAP-15SOAT/oficina-mecanica-lambda-customer-auth/blob/main/docs/security.md) — onde o throttling é delegado ao API Gateway
 - [`security.md`](../security.md) — os riscos aceitos desta decisão, com gatilho de revisão

@@ -10,7 +10,7 @@ k8s_state_bucket = "bkt-oficina-mecanica"
 k8s_state_key    = "infra/prod-simulated/k8s/terraform.tfstate"
 k8s_state_region = "us-east-1"
 
-nlb_listener_port           = 80  # precisa casar com o aws_lb_listener de oficina-mecanica-k8s
+nlb_listener_port           = 80  # precisa casar com o aws_lb_listener de oficina-mecanica-infra-k8s
 customer_auth_function_name = "lbd-oficina-mecanica-customer-auth"
 
 stage_throttling_rate_limit  = 50
