@@ -1,4 +1,4 @@
-# ADR 0003: Integração privada com o EKS — VPC Link V2, NLB interno e NodePort, com o balanceador em `oficina-mecanica-k8s`
+# ADR 0003: Integração privada com o EKS — VPC Link V2, NLB interno e NodePort, com o balanceador em `oficina-mecanica-infra-k8s`
 
 ## Status
 
@@ -22,7 +22,7 @@ Três fatos do ambiente moldam o resto da decisão:
 
 **Topologia.** `cliente → API Gateway → VPC Link V2 → NLB interno → NodePort do nó → Pod`.
 
-**Ownership.** O NLB, seu target group, seu listener, o vínculo com o ASG do node group e a regra de security group da NodePort ficam em **`oficina-mecanica-k8s`**, que exporta `api_nlb_listener_arn`. Este repositório consome esse output por `terraform_remote_state` e é dono apenas do **VPC Link** e do que está acima dele.
+**Ownership.** O NLB, seu target group, seu listener, o vínculo com o ASG do node group e a regra de security group da NodePort ficam em **`oficina-mecanica-infra-k8s`**, que exporta `api_nlb_listener_arn`. Este repositório consome esse output por `terraform_remote_state` e é dono apenas do **VPC Link** e do que está acima dele.
 
 ### Por que o balanceador não está neste repositório
 
@@ -72,7 +72,7 @@ Por isso a verificação externa documentada em [`ci-cd.md`](../ci-cd.md) usa **
 
 - **Neste repositório (gateway).** Foi a primeira proposta, por coesão com o VPC Link. Descartada pelos motivos 1 e 2 da decisão — a substituição do node group não é hipótese.
 - **`oficina-mecanica-infra-base`.** **Criaria ciclo**: o target group depende do ASG e a regra depende do SG do cluster, ambos de `k8s`, que já lê `infra-base`. Além disso `infra-base` é fundação de rede pura, hoje sem nenhuma dependência de saída.
-- **`oficina-mecanica-app`.** Não há Terraform lá, e o CD da aplicação roda a cada commit — não se aplica infraestrutura compartilhada num deploy de aplicação.
+- **`oficina-mecanica-api`.** Não há Terraform lá, e o CD da aplicação roda a cada commit — não se aplica infraestrutura compartilhada num deploy de aplicação.
 - **Um repositório novo de ingress.** Cinco recursos não pagam repositório + CI + CD + segredos + environment + branch protection + mais um `apply` para sequenciar.
 
 *Objeção respondida:* "o repositório `k8s` é app-agnóstico, não deveria conter `nodePort = 30080`". É falso — ele já cria o namespace `oficina` e já carrega `k8s_namespace` como variável. Configuração específica do projeto já mora lá.
@@ -87,7 +87,7 @@ Por isso a verificação externa documentada em [`ci-cd.md`](../ci-cd.md) usa **
 
 ### Sobre o security group do balanceador
 
-O NLB é criado **sem** security group, e um NLB criado sem SG **não pode receber um depois** — só substituindo o balanceador. A decisão fecha essa porta conscientemente: dentro desta VPC, quem poderia alcançar a NodePort diretamente são os próprios nós do EKS (que já falam com o pod por `ClusterIP`), o RDS (que não inicia conexões) e as ENIs do VPC Link. A regra por CIDR da VPC é exatamente o que `oficina-mecanica-database` já faz para o RDS. Substituir um NLB neste laboratório é barato.
+O NLB é criado **sem** security group, e um NLB criado sem SG **não pode receber um depois** — só substituindo o balanceador. A decisão fecha essa porta conscientemente: dentro desta VPC, quem poderia alcançar a NodePort diretamente são os próprios nós do EKS (que já falam com o pod por `ClusterIP`), o RDS (que não inicia conexões) e as ENIs do VPC Link. A regra por CIDR da VPC é exatamente o que `oficina-mecanica-infra-database` já faz para o RDS. Substituir um NLB neste laboratório é barato.
 
 ## Consequências
 
@@ -119,5 +119,5 @@ O NLB é criado **sem** security group, e um NLB criado sem SG **não pode receb
 - [Network Load Balancer — health checks dos target groups](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/target-group-health-checks.html)
 - [Network Load Balancer — security groups](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-security-groups.html)
 - [Kubernetes — Service do tipo NodePort](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport)
-- [`oficina-mecanica-k8s`](https://github.com/FIAP-15SOAT/oficina-mecanica-k8s) — o balanceador e o output `api_nlb_listener_arn`
-- [ADR 0003 da API — Health checks](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/adr/0003-health-checks.md), origem da semântica de `/live` e `/ready`
+- [`oficina-mecanica-infra-k8s`](https://github.com/FIAP-15SOAT/oficina-mecanica-infra-k8s) — o balanceador e o output `api_nlb_listener_arn`
+- [ADR 0003 da API — Health checks](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/adr/0003-health-checks.md), origem da semântica de `/live` e `/ready`

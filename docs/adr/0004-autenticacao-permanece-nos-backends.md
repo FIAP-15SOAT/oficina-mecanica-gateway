@@ -4,7 +4,7 @@
 
 Aceito — 2026-09-07
 
-Referencia e preserva o [ADR 0004 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/adr/0004-autenticacao-de-clientes.md), que desenhou a separação entre os dois fluxos de autenticação.
+Referencia e preserva o [ADR 0004 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/adr/0004-autenticacao-de-clientes.md), que desenhou a separação entre os dois fluxos de autenticação.
 
 ## Contexto
 
@@ -68,6 +68,6 @@ Um requisito **explícito** de autenticação no API Gateway — por exemplo, um
 - [Controlar acesso a HTTP APIs com autorizadores JWT](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html)
 - [Autorizadores Lambda para HTTP APIs](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-lambda-authorizer.html)
 - [Throttling de HTTP APIs](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-throttling.html)
-- [ADR 0004 da API — Autenticação de clientes](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/adr/0004-autenticacao-de-clientes.md)
+- [ADR 0004 da API — Autenticação de clientes](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/adr/0004-autenticacao-de-clientes.md)
 - [`docs/security.md` da função serverless](https://github.com/FIAP-15SOAT/oficina-mecanica-lambda-customer-auth/blob/main/docs/security.md) — onde o throttling é delegado ao API Gateway
 - [`security.md`](../security.md) — os riscos aceitos desta decisão, com gatilho de revisão

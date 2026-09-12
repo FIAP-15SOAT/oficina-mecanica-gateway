@@ -116,7 +116,7 @@ curl -i "$EP/api/health/ready"
 **Uma primeira resposta negativa não é conclusiva.** O caminho privado leva minutos para se restabelecer em dois casos conhecidos: a propagação do registro do alvo no target group, e — principalmente — logo após criar o VPC Link, que responde `AVAILABLE` **antes** de o plano de dados estar utilizável. Repita a tentativa antes de concluir por falha; o detalhe está em [architecture.md › Falhas conhecidas](architecture.md#falhas-conhecidas).
 
 ```bash
-# 2. Um caminho não publicado precisa ser recusado PELA BORDA
+# 2. Um caminho não publicado precisa ser recusado PELO API GATEWAY
 curl -i "$EP/__caminho-nao-publicado__"     # espera-se 404 {"message":"Not Found"}
 
 # 3. Uma rota protegida sem credencial: o 401 vem da APLICAÇÃO, não do API Gateway
@@ -157,8 +157,8 @@ Tudo que precisa existir fora do código para o repositório funcionar. Nada aqu
 Pela linha de comando:
 
 ```bash
-gh variable set ENABLE_DEPLOY --body "true" --repo FIAP-15SOAT/oficina-mecanica-gateway
-gh api --method PUT repos/FIAP-15SOAT/oficina-mecanica-gateway/environments/production
+gh variable set ENABLE_DEPLOY --body "true" --repo FIAP-15SOAT/oficina-mecanica-api-gateway
+gh api --method PUT repos/FIAP-15SOAT/oficina-mecanica-api-gateway/environments/production
 ```
 
 > **Nota sobre o AWS Academy.** As credenciais mudam a cada reinício do laboratório. Quando isso acontece, os três secrets precisam ser atualizados — e o `AWS_SESSION_TOKEN` é o mais fácil de esquecer, porque não existe em contas AWS comuns. Sem ele, toda chamada falha com `InvalidClientTokenId`.

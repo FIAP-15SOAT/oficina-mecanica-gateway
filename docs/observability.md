@@ -123,9 +123,9 @@ Para a função serverless, o mesmo identificador aparece no log de invocação 
 
 | Não é dela | De quem é |
 |---|---|
-| Rastreamento distribuído | OpenTelemetry na aplicação — [ADR 0005 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/adr/0005-opentelemetry.md), hoje desligado por gate |
-| Estrutura e sanitização do log de aplicação | [ADR 0002 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/adr/0002-logging-estruturado.md) |
-| Semântica de saúde (`/live` vs `/ready`) | [ADR 0003 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/adr/0003-health-checks.md) |
+| Rastreamento distribuído | OpenTelemetry na aplicação — [ADR 0005 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/adr/0005-opentelemetry.md), hoje desligado por gate |
+| Estrutura e sanitização do log de aplicação | [ADR 0002 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/adr/0002-logging-estruturado.md) |
+| Semântica de saúde (`/live` vs `/ready`) | [ADR 0003 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/adr/0003-health-checks.md) |
 | Métricas de negócio | Aplicação |
 | Monitor sintético contínuo | **Não existe.** O API Gateway torna possível verificar de fora, mas a verificação é manual e pontual — ver [ci-cd.md](ci-cd.md#verificação-externa-após-o-provisionamento) |
 

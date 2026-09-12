@@ -72,7 +72,7 @@ jobs:
 
       # `--extends=minimal` mantem a validacao ESTRUTURAL da especificacao
       # ligada. As tres regras puladas sao opinativas de estilo de API
-      # publica e nao dizem nada sobre validade: a borda nao declara `security`
+      # publica e nao dizem nada sobre validade: o API Gateway nao declara `security`
       # porque nao autentica (ADR 0004), `servers` so existe depois do
       # provisionamento, e `operationId` serve a geradores de cliente que este
       # documento nao alimenta.

@@ -91,7 +91,7 @@ Nenhuma exige valor externo além das credenciais — todas têm default.
 | `k8s_state_bucket` | `string` | `bkt-oficina-mecanica` | Bucket do state de `k8s` |
 | `k8s_state_key` | `string` | `infra/prod-simulated/k8s/terraform.tfstate` | Chave do state de `k8s` |
 | `k8s_state_region` | `string` | `us-east-1` | Região do bucket de `k8s` |
-| `nlb_listener_port` | `number` | `80` | Porta do listener do NLB interno; único destino do egress do SG do VPC Link. Precisa casar com o `aws_lb_listener` em `oficina-mecanica-k8s` |
+| `nlb_listener_port` | `number` | `80` | Porta do listener do NLB interno; único destino do egress do SG do VPC Link. Precisa casar com o `aws_lb_listener` em `oficina-mecanica-infra-k8s` |
 | `customer_auth_function_name` | `string` | `lbd-oficina-mecanica-customer-auth` | Nome da função serverless; compõe o URI de invocação |
 | `stage_throttling_rate_limit` | `number` | `50` | Requisições por segundo do throttling padrão do stage |
 | `stage_throttling_burst_limit` | `number` | `100` | Rajada do throttling padrão |
@@ -180,7 +180,7 @@ Para derrubar o ambiente ao fim dos testes:
 terraform destroy
 ```
 
-> A ordem importa entre repositórios — destrua **este** antes do caminho privado em `oficina-mecanica-k8s`. Ver [architecture.md](architecture.md#ordem-de-aplicação-e-de-rollback).
+> A ordem importa entre repositórios — destrua **este** antes do caminho privado em `oficina-mecanica-infra-k8s`. Ver [architecture.md](architecture.md#ordem-de-aplicação-e-de-rollback).
 
 ## Documentação relacionada
 

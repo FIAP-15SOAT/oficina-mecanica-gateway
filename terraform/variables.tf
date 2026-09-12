@@ -53,7 +53,7 @@ variable "k8s_state_region" {
 }
 
 variable "nlb_listener_port" {
-  description = "TCP port of the internal NLB listener provisioned in `oficina-mecanica-k8s`"
+  description = "TCP port of the internal NLB listener provisioned in `oficina-mecanica-infra-k8s`"
   type        = number
   default     = 80
 }

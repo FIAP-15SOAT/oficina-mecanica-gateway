@@ -114,4 +114,4 @@ Nada aqui é pendência: são caminhos conhecidos caso o contexto mude.
 - 📐 [ADR 0004](adr/0004-autenticacao-permanece-nos-backends.md) — por que não há autenticação no API Gateway.
 - 📊 [Observabilidade](observability.md) — o que o log registra e o que ele deliberadamente não registra.
 - 🔒 [`security.md` da função serverless](https://github.com/FIAP-15SOAT/oficina-mecanica-lambda-customer-auth/blob/main/docs/security.md) — onde o throttling é delegado a este API Gateway.
-- 🔒 [`security.md` da API](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/security.md) — mitigações no código e relatórios.
+- 🔒 [`security.md` da API](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/security.md) — mitigações no código e relatórios.

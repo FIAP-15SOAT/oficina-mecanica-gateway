@@ -50,7 +50,7 @@ O documento **não** declara `requestBody`, `components.schemas`, códigos de er
 
 | Backend | Contrato de payload |
 |---|---|
-| API no EKS | [`docs/api.md`](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/api.md) e o `/api/docs-json` publicado pela própria aplicação |
+| API no EKS | [`docs/api.md`](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/api.md) e o `/api/docs-json` publicado pela própria aplicação |
 | Função serverless | [`docs/contracts.md`](https://github.com/FIAP-15SOAT/oficina-mecanica-lambda-customer-auth/blob/main/docs/contracts.md) |
 
 **"Sem schemas" não significa "sem estrutura".** O documento continua sendo um OpenAPI 3.0 **válido**: cada operação declara um `responses` mínimo (`default` com `description`) e `/api/{proxy+}` declara o `parameters` do `proxy` com `required: true`. Nenhum dos dois é contrato de payload — e sem eles o documento é inválido segundo a especificação, o que reprova o lint e pode virar warning no import, que `fail_on_warnings = true` transforma em falha de `apply`.

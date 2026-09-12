@@ -34,7 +34,7 @@ HTTP API não oferece *request validation*, WAF, resource policy, endpoint priva
 
 - **Validação de schema**: ver o fato 3 do contexto. Ela permanece nos backends, que a fazem bem.
 - **WAF**: não há requisito de proteção contra tráfego adversário além do throttling.
-- **X-Ray**: o rastreamento distribuído do projeto é OpenTelemetry na aplicação, e está desligado por decisão do [ADR 0005 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/adr/0005-opentelemetry.md).
+- **X-Ray**: o rastreamento distribuído do projeto é OpenTelemetry na aplicação, e está desligado por decisão do [ADR 0005 da API](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/adr/0005-opentelemetry.md).
 - **API keys / usage plans**: os consumidores são clientes portadores de JWT, não integrações identificadas por chave.
 
 ## Alternativas consideradas e descartadas
@@ -69,4 +69,4 @@ Surgir um requisito **real** de WAF, de API keys por cliente, ou de validação 
 - [Formato de payload de integração proxy de Lambda](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html)
 - [Configurar o log de acesso de uma HTTP API](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-logging.html)
 - [Preços do Amazon API Gateway](https://aws.amazon.com/api-gateway/pricing/)
-- [ADR 0005 da API — OpenTelemetry](https://github.com/FIAP-15SOAT/oficina-mecanica-app/blob/master/docs/adr/0005-opentelemetry.md)
+- [ADR 0005 da API — OpenTelemetry](https://github.com/FIAP-15SOAT/oficina-mecanica-api/blob/main/docs/adr/0005-opentelemetry.md)
